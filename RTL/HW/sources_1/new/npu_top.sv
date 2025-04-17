@@ -166,5 +166,4 @@ npu_act_mem ACTIVATION_MEM (
     .doutb (npu_act_rddata_i  )
 );
 
-
 endmodule

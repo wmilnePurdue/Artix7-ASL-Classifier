@@ -116,7 +116,7 @@ class Instruction:
                 raise Exception("ERROR: Jump Location, " + self.const_string + ", not found")
             else:
                 const = append_string(bin(int(str(self.const_value))).replace('0b', ''), 19)
-                inst = int(opcode + "00000000" + const, 2)
+                inst = int(opcode + src0 + "0000" + const, 2)
         elif self.inst_type == InstType.RET:
             const = append_string(const, 19)
             inst = int(opcode + src0 + "0000" + const, 2)
@@ -319,15 +319,19 @@ def parse(code, codeline, const_list):
     elif "call" in code:
         code_split = list(filter(None, code.replace(',', ' ').split(' ')))
         inst_type = InstType.CALL
-        if len(code_split) == 2:
+        if len(code_split) == 3:
+            const = code_split[2]
+            const_type = get_operand_type(const)
             src0 = code_split[1]
             src0_type = get_operand_type(src0)
-            if src0_type == OperandType.UNDEFINED:
-                return Instruction(inst_type, "r0", "0000", "r0", 0, 0, src0, -1)
+            if src0_type != OperandType.REGISTER:
+                raise Exception("ERROR: Call can only save the program counter in a register" + error_suffix)
+            if const_type == OperandType.UNDEFINED:
+                return Instruction(inst_type, src0, "0000", "r0", 0, 0, const, -1)
             else:
-                raise Exception("ERROR: CALL cannot be used with registers or numerical values" + error_suffix)
+                raise Exception("ERROR: CALL cannot use registers or numerical values for address targets" + error_suffix)
         else:
-            raise Exception("ERROR: CALL parameters should be exactly 1" + error_suffix)
+            raise Exception("ERROR: CALL parameters should be exactly 2" + error_suffix)
     elif "ret" in code:
         code_split = list(filter(None, code.replace(',', ' ').split(' ')))
         inst_type = InstType.RET
