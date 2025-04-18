@@ -1,0 +1,2 @@
+#Ignore Vivado project - make sure to update recreate.tcl if necessary
+HandDetect_SoC/
