@@ -4,7 +4,8 @@
 
 `define USE_PLL
 `define GPIO_COUNT 10
-`define SPI_OUTPUT
+//`define SPI_OUTPUT
+`define SSD_OUTPUT
 `define NPU_ACCELERATOR
 
 `endif

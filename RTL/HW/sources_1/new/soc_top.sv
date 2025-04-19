@@ -44,6 +44,11 @@ module soc_top(
     
     output logic           dc,
     output logic           csn
+`elsif SSD_OUTPUT
+    ,
+    input  wire            SW0,
+    output wire   [6:0]    seg,
+    output wire   [3:0]    an
 `endif
 );
 
@@ -267,7 +272,25 @@ spi_io SPI_INTERFACE (
     .dc                  (dc                       ),
     .csn                 (csn                      )
 );
-`elsif VGA_OUTPUT
+`elsif SSD_OUTPUT
+ssd_io SSD_INTERFACE(
+    .clk(clk),
+    .resetn(resetn),
+    .ahb_s0_haddr_i      (ahb_out_unit_haddr_o     ),
+    .ahb_s0_hwrite_i     (ahb_out_unit_hwrite_o    ),
+    .ahb_s0_hsize_i      (ahb_out_unit_hsize_o     ),
+    .ahb_s0_hburst_i     (ahb_out_unit_hburst_o    ),
+    .ahb_s0_hprot_i      (ahb_out_unit_hprot_o     ),
+    .ahb_s0_htrans_i     (ahb_out_unit_htrans_o    ),
+    .ahb_s0_hmastlock_i  (ahb_out_unit_hmastlock_o ),
+    .ahb_s0_hwdata_i     (ahb_out_unit_hwdata_o    ),
+    .SW0(SW0),
+    .ahb_s0_hready_o     (ahb_out_unit_hready_i    ),
+    .ahb_s0_hresp_o      (ahb_out_unit_hresp_i     ),
+    .ahb_s0_hrdata_o     (ahb_out_unit_hrdata_i    ),
+    .seg(seg),
+    .an(an)
+);
 `else
     assign ahb_out_unit_hready_i = 1'b1;
     assign ahb_out_unit_hresp_i  = 1'b0;
