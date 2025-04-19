@@ -60,17 +60,17 @@ output cur_state_fc2_c; // FC2
 
 // Control signals to MAC Top
 output reg [31:0] mac_enable; // active high level signal. Qualifies all other inputs
-output reg [1:0] mac_start_p; // pulse indicates start of dot product
-output reg [1:0] mac_last_p;  // last cycle of dot product input
+output reg mac_start_p; // pulse indicates start of dot product
+output reg mac_last_p;  // last cycle of dot product input
 
 // Filter Mem read 
 output reg [31:0] filter_mem_rd_en; // active high per 32 banks read enable
-output reg [LOG2_FILTER_MEM_ADDR_WIDTH-1:0] filter_mem_rd_addr; // byte aligned address; read address common to all 32 banks
+output reg [`LOG2_FILTER_MEM_ADDR_WIDTH-1:0] filter_mem_rd_addr; // byte aligned address; read address common to all 32 banks
 
 // Activation Mem read
 output reg activation_mem_rd_en;
-output reg [LOG2_ACT_ADDR_WIDTH-1:0] activation_mem_rd_addr; // byte aligned address 
-output reg [31:0] activation_mem_rd_bypass; // when this is high, generate 0 as read data out instead of memory output with same latency
+output reg [`LOG2_ACT_ADDR_WIDTH-1:0] activation_mem_rd_addr; // byte aligned address 
+output reg activation_mem_rd_bypass; // when this is high, generate 0 as read data out instead of memory output with same latency
 
 // State one-hot defines
 localparam NPU_STATE_IDLE                 = 14'b00_0000_0000_0001;
@@ -107,9 +107,9 @@ reg [1:0] op_rel_col_cnt_without_pad;
 reg [1:0] fc1_row_cnt;
 reg [1:0] fc1_col_cnt;
 reg [4:0] fc1_inp_ch_cnt;
-reg [4:0] fc2_act_cnt;
-reg [4:0] fc2_act_cnt_r1;
-reg [4:0] fc2_act_cnt_r2;
+reg [5:0] fc2_act_cnt;
+reg [5:0] fc2_act_cnt_r1;
+reg [5:0] fc2_act_cnt_r2;
 
 reg [3:0] cur_state_conv1_pipeline_r;
 reg [3:0] cur_state_conv2_pipeline_r;
@@ -117,6 +117,8 @@ reg [3:0] cur_state_conv3_pipeline_r;
 reg [3:0] cur_state_fc1_1_pipeline_r;
 reg [3:0] cur_state_fc1_2_pipeline_r;
 reg [3:0] cur_state_fc2_pipeline_r;
+reg [3:0] mac_boundary_start_pipeline_r;
+reg [3:0] mac_boundary_end_pipeline_r;
 
 reg pad_top_left_out_pixel_r1; 
 reg pad_top_right_out_pixel_r1;
@@ -131,9 +133,11 @@ reg [1:0] filter_col_cnt_r1;
 reg [5:0] input_img_row_num_without_pad_r1;
 reg [5:0] input_img_col_num_without_pad_r1; 
 
-reg [LOG2_ACT_ADDR_WIDTH-1:0] conv_act_mem_rd_addr_r2;
-reg [LOG2_ACT_ADDR_WIDTH-1:0] fc1_act_mem_rd_addr_r1;
-reg [LOG2_ACT_ADDR_WIDTH-1:0] fc1_act_mem_rd_addr_r2;
+reg [`LOG2_ACT_ADDR_WIDTH-1:0] conv_act_mem_rd_addr_r2;
+reg [`LOG2_ACT_ADDR_WIDTH-1:0] fc1_act_mem_rd_addr_r1;
+reg [`LOG2_ACT_ADDR_WIDTH-1:0] fc1_act_mem_rd_addr_r2;
+
+reg [4:0] result_wr_wait_cnt;
 
 reg [3:0] filter_num_in_ch_cnt_r1;
 reg bypass_act_mem_rd_r2;
@@ -147,11 +151,26 @@ wire cur_state_conv3_c = (npu_state_r == NPU_STATE_CONV3);
 wire cur_state_fc1_1_c = (npu_state_r == NPU_STATE_FC1_1); // 32 neurons of FC1
 wire cur_state_fc1_2_c = (npu_state_r == NPU_STATE_FC1_2); // next 32 neurons of FC1
 wire cur_state_fc2_c   = (npu_state_r == NPU_STATE_FC2); // next 32 neurons of FC1
+wire cur_state_wait_conv1_result_wr_c = (npu_state_r == NPU_STATE_WAIT_CONV1_RESULT_WR);
+wire cur_state_wait_conv2_result_wr_c = (npu_state_r == NPU_STATE_WAIT_CONV2_RESULT_WR);
+wire cur_state_wait_conv3_result_wr_c = (npu_state_r == NPU_STATE_WAIT_CONV3_RESULT_WR);
+wire cur_state_wait_fc1_1_result_wr_c = (npu_state_r == NPU_STATE_WAIT_FC1_1_RESULT_WR);
+wire cur_state_wait_fc1_2_result_wr_c = (npu_state_r == NPU_STATE_WAIT_FC1_2_RESULT_WR);
+
 
 wire output_pixel_comp_boundary_c = (filter_row_cnt_r == 2'd2) & (filter_col_cnt_r == 2'd2) & 
                                     (((npu_state_r == NPU_STATE_CONV1) & (filter_num_in_ch_cnt_r == `CONV1_NUM_INPUT_CH_MINUS_1)) |
                                      ((npu_state_r == NPU_STATE_CONV2) & (filter_num_in_ch_cnt_r == `CONV2_NUM_INPUT_CH_MINUS_1)) |
                                      ((npu_state_r == NPU_STATE_CONV3) & (filter_num_in_ch_cnt_r == `CONV3_NUM_INPUT_CH_MINUS_1)));
+
+wire mac_boundary_start_c = ((filter_row_cnt_r == 2'd0) & (filter_col_cnt_r == 2'd0) & (filter_num_in_ch_cnt_r == 4'd0) & 
+                             (cur_state_conv1_c | cur_state_conv2_c | cur_state_conv3_c)) |  
+                             ((cur_state_fc1_1_c | cur_state_fc1_2_c) &  (fc1_row_cnt == 2'd0) & (fc1_col_cnt == 2'd0) & (fc1_inp_ch_cnt == 5'd0)) |
+                             (cur_state_fc2_c & (fc2_act_cnt == 6'd0));
+                             
+wire mac_boundary_end_c =  (output_pixel_comp_boundary_c & (cur_state_conv1_c | cur_state_conv2_c | cur_state_conv3_c)) |
+                           ((cur_state_fc1_1_c | cur_state_fc1_2_c) &  (fc1_row_cnt == 2'd3) & (fc1_col_cnt == 2'd3) & (fc1_inp_ch_cnt == 5'd23)) |
+                           (cur_state_fc2_c & (fc2_act_cnt == 6'd63));  
 
 // Conv: last output pixel and last computation for that
 wire conv_termnical_cnt_c = (quad_op_row_cnt == quad_row_col_cnt_max_minus_1) & (quad_op_col_cnt == quad_row_col_cnt_max_minus_1) & 
@@ -282,7 +301,7 @@ if (~npu_rst_n) begin
     op_rel_row_cnt_without_pad   <= 2'd0;
     op_rel_col_cnt_without_pad   <= 2'd0;  
 end else begin
-    if (cur_state_conv1_r1 | cur_state_conv2_r1 | cur_state_conv3_r1) begin
+    if (cur_state_conv1_pipeline_r[0] | cur_state_conv2_pipeline_r[0] | cur_state_conv3_pipeline_r[0]) begin
         if (filter_col_cnt_r1 == 2'd2) begin
             op_rel_col_cnt_without_pad   <= 2'd0;
             if (op_rel_col_cnt_without_pad != 2'd0) begin
@@ -303,12 +322,12 @@ end else begin
 end
 
 // A layer reads from previous layer's output mem section
-wire [12:0] activation_mem_start_offset_r2_c = (cur_state_conv1_r2) ? `INPUT_IMAGE_START_ADDR :
-                                            (cur_state_conv2_r2) ? `CONV1_OUTPUT_START_ADDR :
-                                            (cur_state_conv3_r2) ? `CONV2_OUTPUT_START_ADDR :
-                                            (cur_state_fc1_1_r2) ? `CONV3_OUTPUT_START_ADDR :
-                                            (cur_state_fc1_2_r2) ? `CONV3_OUTPUT_START_ADDR :
-                                            (cur_state_fc2_r2)   ? `FC1_1_OUTPUT_START_ADDR :
+wire [12:0] activation_mem_start_offset_r2_c = (cur_state_conv1_pipeline_r[1]) ? `INPUT_IMAGE_START_ADDR :
+                                            (cur_state_conv2_pipeline_r[1]) ? `CONV1_OUTPUT_START_ADDR :
+                                            (cur_state_conv3_pipeline_r[1]) ? `CONV2_OUTPUT_START_ADDR :
+                                            (cur_state_fc1_1_pipeline_r[1]) ? `CONV3_OUTPUT_START_ADDR :
+                                            (cur_state_fc1_2_pipeline_r[1]) ? `CONV3_OUTPUT_START_ADDR :
+                                            (cur_state_fc2_pipeline_r[1])   ? `FC1_1_OUTPUT_START_ADDR :
                                             `FC2_OUTPUT_START_ADDR;
                                               
 
@@ -318,34 +337,38 @@ wire [12:0] activation_mem_start_offset_r2_c = (cur_state_conv1_r2) ? `INPUT_IMA
 // Input images are stored in Image Act memory in per channel granularity
 // While reading across channels an offset has to be applied for channel start address
 
-wire [11:0] ch_offset_img_act_mem_rd_r1_c = (cur_state_conv1_r1) ? (filter_num_in_ch_cnt_r1 << 10) :
-                                         (cur_state_conv2_r1) ? (filter_num_in_ch_cnt_r1 << 8) :
+wire [11:0] ch_offset_img_act_mem_rd_r1_c = (cur_state_conv1_pipeline_r[0]) ? (filter_num_in_ch_cnt_r1 << 10) :
+                                         (cur_state_conv2_pipeline_r[0]) ? (filter_num_in_ch_cnt_r1 << 8) :
                                          (filter_num_in_ch_cnt_r1 << 6);  
                                          
 // Number of Input pixels per channel per row for Conv 1 is 32
 // Number of Input pixels per channel per row for Conv 2 is 16
 // Number of Input pixels per channel per row for Conv 3 is 8                                        
 wire [6:0] sum_start_plus_rel_row_cnt_without_pad_r1_c = input_img_row_num_without_pad_r1 + op_rel_row_cnt_without_pad;
-wire [11:0] abs_row_cnt_without_pad_r1_c =  (cur_state_conv1_r1) ? (sum_start_plus_rel_row_cnt_without_pad_r1_c << 5) : 
-                                         (cur_state_conv2_r1) ? (sum_start_plus_rel_row_cnt_without_pad_r1_c << 4) : 
+wire [11:0] abs_row_cnt_without_pad_r1_c =  (cur_state_conv1_pipeline_r[0]) ? (sum_start_plus_rel_row_cnt_without_pad_r1_c << 5) : 
+                                         (cur_state_conv2_pipeline_r[0]) ? (sum_start_plus_rel_row_cnt_without_pad_r1_c << 4) : 
                                          (sum_start_plus_rel_row_cnt_without_pad_r1_c << 3);
                                          
     
                                                                                        
 wire [6:0] sum_start_plus_rel_col_cnt_without_pad_r1_c = input_img_col_num_without_pad_r1 + op_rel_col_cnt_without_pad; 
-wire [LOG2_ACT_ADDR_WIDTH-1:0] conv_act_mem_rd_addr_r1_c = abs_row_cnt_without_pad_r1_c + sum_start_plus_rel_col_cnt_without_pad_r1_c + ch_offset_img_act_mem_rd_r1_c;                                                         
+wire [`LOG2_ACT_ADDR_WIDTH-1:0] conv_act_mem_rd_addr_r1_c = abs_row_cnt_without_pad_r1_c + sum_start_plus_rel_col_cnt_without_pad_r1_c + ch_offset_img_act_mem_rd_r1_c;                                                         
 
-wire [LOG2_ACT_ADDR_WIDTH-1:0] fc1_act_mem_rd_addr_c = {fc1_inp_ch_cnt,fc1_row_cnt,fc1_col_cnt};
+wire [`LOG2_ACT_ADDR_WIDTH-1:0] fc1_act_mem_rd_addr_c = {fc1_inp_ch_cnt,fc1_row_cnt,fc1_col_cnt};
 wire fc1_terminal_cnt_c = (fc1_row_cnt == 2'd2) & (fc1_col_cnt == 2'd2) & (fc1_inp_ch_cnt == 5'd23);
 wire fc2_terminal_cnt_c = (fc2_act_cnt == 5'd23);
 // As per flattening order done by Matlab Flatten layer; Row (or Height first), then Col (or Width) and then input channel
+
+wire result_wr_wait_terminal_cnt_c = (result_wr_wait_cnt == 5'd31);
+
 always @ (posedge npu_clk or negedge npu_rst_n) 
 begin
 if (~npu_rst_n) begin
     fc1_row_cnt    <= 2'd0;
     fc1_col_cnt    <= 2'd0;
     fc1_inp_ch_cnt <= 5'd0;
-    fc2_act_cnt    <= 5'd0;      
+    fc2_act_cnt    <= 5'd0;   
+    result_wr_wait_cnt <= 5'd0;   
 end else begin
     if (cur_state_fc1_1_c | cur_state_fc1_2_c) begin
         if (fc1_row_cnt == 2'd3) begin
@@ -371,12 +394,19 @@ end else begin
    end
    // FC2 - read activation linearly 
    if (cur_state_fc2_c) begin
-       if (fc2_act_cnt < 5'd23) begin
-           fc2_act_cnt <= fc2_act_cnt + 5'd1;
+       if (fc2_act_cnt < 6'd63) begin
+           fc2_act_cnt <= fc2_act_cnt + 6'd1;
        end
    end else begin
-       fc2_act_acnt <= 5'd0;
+       fc2_act_cnt <= 6'd0;
    end  
+   
+   if (cur_state_wait_conv1_result_wr_c | cur_state_wait_conv2_result_wr_c | cur_state_wait_conv3_result_wr_c |
+       cur_state_wait_fc1_1_result_wr_c | cur_state_wait_fc1_2_result_wr_c) begin
+       result_wr_wait_cnt <= result_wr_wait_cnt + 5'd1;
+   end else begin
+       result_wr_wait_cnt <= 5'd0;
+   end     
 end          
 
 // pipelining
@@ -389,6 +419,8 @@ begin
    cur_state_fc1_1_pipeline_r     <= 4'd0;
    cur_state_fc1_2_pipeline_r     <= 4'd0;
    cur_state_fc2_pipeline_r       <= 4'd0;
+   mac_boundary_start_pipeline_r  <= 4'd0;
+   mac_boundary_end_pipeline_r    <= 4'd0;
    pad_top_left_out_pixel_r1      <= 1'b0; 
    pad_top_right_out_pixel_r1     <= 1'b0;
    pad_bottom_left_out_pixel_r1   <= 1'b0;
@@ -405,27 +437,17 @@ begin
    fc1_act_mem_rd_addr_r1         <= 13'd0;
    fc1_act_mem_rd_addr_r2         <= 13'd0;
    bypass_act_mem_rd_r2           <= 1'b0;
-   fc2_act_cnt_r1                 <= 5'd0;
-   fc2_act_cnt_r2                 <= 5'd0;
+   fc2_act_cnt_r1                 <= 6'd0;
+   fc2_act_cnt_r2                 <= 6'd0;
 end else begin
-   cur_state_conv1_pipeline_r     <= {cur_state_conv1_pipeline_r[2:1],cur_state_conv1_pipeline_c};
-   cur_state_conv2_pipeline_r     <= {cur_state_conv2_pipeline_r[2:1],cur_state_conv2_pipeline_c};
-   cur_state_conv3_pipeline_r     <= {cur_state_conv3_pipeline_r[2:1],cur_state_conv3_pipeline_c};
-   cur_state_fc1_1_pipeline_r     <= {cur_state_fc1_1_pipeline_r[2:1],cur_state_fc1_1_pipeline_c};
-   cur_state_fc1_2_pipeline_r     <= {cur_state_fc1_2_pipeline_r[2:1],cur_state_fc1_2_pipeline_c};
-   cur_state_fc2_pipeline_r       <= {cur_state_fc2_pipeline_r[2:1],cur_state_fc2_pipeline_c};
-   cur_state_conv1_r1             <= cur_state_conv1_c;
-   cur_state_conv2_r1             <= cur_state_conv2_c;
-   cur_state_conv3_r1             <= cur_state_conv3_c;
-   cur_state_fc1_1_r1             <= cur_state_fc1_1_c;
-   cur_state_fc1_2_r1             <= cur_state_fc1_2_c;
-   cur_state_fc2_r1               <= cur_state_fc2_c;
-   cur_state_conv1_r2             <= cur_state_conv1_r1;
-   cur_state_conv2_r2             <= cur_state_conv2_r1;
-   cur_state_conv3_r2             <= cur_state_conv3_r1;
-   cur_state_fc1_1_r2             <= cur_state_fc1_1_r1;
-   cur_state_fc1_2_r2             <= cur_state_fc1_2_r1;
-   cur_state_fc2_r2               <= cur_state_fc2_r1;
+   cur_state_conv1_pipeline_r     <= {cur_state_conv1_pipeline_r[2:0],cur_state_conv1_c};
+   cur_state_conv2_pipeline_r     <= {cur_state_conv2_pipeline_r[2:0],cur_state_conv2_c};
+   cur_state_conv3_pipeline_r     <= {cur_state_conv3_pipeline_r[2:0],cur_state_conv3_c};
+   cur_state_fc1_1_pipeline_r     <= {cur_state_fc1_1_pipeline_r[2:0],cur_state_fc1_1_c};
+   cur_state_fc1_2_pipeline_r     <= {cur_state_fc1_2_pipeline_r[2:0],cur_state_fc1_2_c};
+   cur_state_fc2_pipeline_r       <= {cur_state_fc2_pipeline_r[2:0],cur_state_fc2_c};
+   mac_boundary_start_pipeline_r  <= {mac_boundary_start_pipeline_r[2:0],mac_boundary_start_c};
+   mac_boundary_end_pipeline_r    <= {mac_boundary_end_pipeline_r[2:0],mac_boundary_end_c};
    pad_top_left_out_pixel_r1      <= pad_top_left_out_pixel_c; 
    pad_top_right_out_pixel_r1     <= pad_top_right_out_pixel_c;
    pad_bottom_left_out_pixel_r1   <= pad_bottom_left_out_pixel_c;
@@ -481,9 +503,9 @@ wire [31:0] filter_rd_en_mux_r4_c =    cur_state_conv1_pipeline_r[3]  ? `CONV1_F
                                        cur_state_fc2_pipeline_r[3]    ? `FC2_FILTER_EN :
                                        32'd0;
                                        
-wire cur_state_fc_or_conv_r1_c = (cur_state_conv1_r1 | cur_state_conv2_r1 |
-                                 cur_state_conv3_r1 | cur_state_fc1_1_r1 |
-                                 cur_state_fc1_2_r1 | cur_state_fc2_r1);                                       
+wire cur_state_fc_or_conv_r1_c = (cur_state_conv1_pipeline_r[0] | cur_state_conv2_pipeline_r[0] |
+                                 cur_state_conv3_pipeline_r[0] | cur_state_fc1_1_pipeline_r[0] |
+                                 cur_state_fc1_2_pipeline_r[0] | cur_state_fc2_pipeline_r[0]);                                       
                                        
 wire cur_state_fc_or_conv_r2_c = (cur_state_conv1_pipeline_r[1] | cur_state_conv2_pipeline_r[1] |
                                  cur_state_conv3_pipeline_r[1] | cur_state_fc1_1_pipeline_r[1] |
@@ -492,9 +514,9 @@ wire cur_state_fc_or_conv_r2_c = (cur_state_conv1_pipeline_r[1] | cur_state_conv
 // This is activation mem addr muxed based on state before adding ACT mem address
 // start offset
 wire [`LOG2_ACT_ADDR_WIDTH-1:0] activation_mem_rd_addr_rel_mux_r2_c = (cur_state_conv1_pipeline_r[1] | cur_state_conv2_pipeline_r[1] | cur_state_conv3_pipeline_r[1]) ?
-                                                                       conv_act_mem_rd_addr_pipeline_r[1] : 
+                                                                       conv_act_mem_rd_addr_r2 : 
 								       (cur_state_fc1_1_pipeline_r[1] | cur_state_fc1_2_pipeline_r[1]) ? 
-								       fc1_act_mem_rd_addr_pipeline_r[1] : fc2_act_cnt_pipeline_r[1];  
+								       fc1_act_mem_rd_addr_r2 : fc2_act_cnt_r2;  
                                                                    
 
 always @ (posedge npu_clk or negedge npu_rst_n) 
@@ -515,13 +537,13 @@ begin
       // Filter read en and addr
       filter_mem_rd_en       <=  filter_rd_en_mux_r2_c;
       mac_enable             <=  filter_rd_en_mux_r4_c;
-      mac_start_p            <=  conv_act_mem_rd_addr_pipeline_r[3] & ~conv_act_mem_rd_addr_pipeline_r[4];
-      mac_last_p             <=  conv_act_mem_rd_addr_pipeline_r[3] & ~conv_act_mem_rd_addr_pipeline_r[2];
+      mac_start_p            <=  mac_boundary_start_pipeline_r[3];
+      mac_last_p             <=  mac_boundary_end_pipeline_r[3];
       if (cur_state_fc_or_conv_r2_c) begin
           if ((filter_mem_rd_addr == filter_rd_end_addr_mux_r2_c) & cur_state_fc_or_conv_r1_c) begin
               filter_mem_rd_addr <= filter_rd_start_addr_mux_r2_c;
           end else begin
-              filter_mem_rd_addr <= filter_rd_start_addr_mux_r2_c + 1;
+              filter_mem_rd_addr <= filter_mem_rd_addr + 1;
           end
       end
       
@@ -547,44 +569,43 @@ end
 // State Machine
 wire trigger_npu_c = (img_num_rows_written >= cfg_thrshld_num_rows_to_start) & (|cfg_thrshld_num_rows_to_start);
 
-
 always @ (*)
 begin
     case(npu_state_r)
     NPU_STATE_IDLE:
     begin
         nxt_npu_state_r = (trigger_npu_c) ? NPU_STATE_CONV1 : NPU_STATE_IDLE;
-	npu_layer_in_progress = 3'd0;
+	    npu_layer_in_progress = 3'd0;
     end
     NPU_STATE_CONV1:
     begin
         nxt_npu_state_r = (conv_termnical_cnt_c) ? NPU_STATE_WAIT_CONV1_RESULT_WR : NPU_STATE_CONV1;
-	npu_layer_in_progress = 3'd1;
+	    npu_layer_in_progress = 3'd1;
     end
     NPU_STATE_WAIT_CONV1_RESULT_WR:
     begin
         nxt_npu_state_r = (result_wr_wait_terminal_cnt_c) ? NPU_STATE_CONV2 : NPU_STATE_WAIT_CONV1_RESULT_WR;
-	npu_layer_in_progress = 3'd1;
+	    npu_layer_in_progress = 3'd1;
     end
     NPU_STATE_CONV2:
     begin
         nxt_npu_state_r = (conv_termnical_cnt_c) ? NPU_STATE_WAIT_CONV2_RESULT_WR : NPU_STATE_CONV2;
-	npu_layer_in_progress = 3'd2;
+	    npu_layer_in_progress = 3'd2;
     end
     NPU_STATE_WAIT_CONV2_RESULT_WR:
     begin
         nxt_npu_state_r = (result_wr_wait_terminal_cnt_c) ? NPU_STATE_CONV3 : NPU_STATE_WAIT_CONV2_RESULT_WR;
-	npu_layer_in_progress = 3'd2;
+	    npu_layer_in_progress = 3'd2;
     end
     NPU_STATE_CONV3:
     begin
         nxt_npu_state_r = (conv_termnical_cnt_c) ? NPU_STATE_WAIT_CONV3_RESULT_WR : NPU_STATE_CONV3;
-	npu_layer_in_progress = 3'd3;
+	    npu_layer_in_progress = 3'd3;
     end
     NPU_STATE_WAIT_CONV3_RESULT_WR:
     begin
         nxt_npu_state_r = (result_wr_wait_terminal_cnt_c) ? NPU_STATE_FC1_1 : NPU_STATE_WAIT_CONV3_RESULT_WR;
-	npu_layer_in_progress = 3'd3;
+	    npu_layer_in_progress = 3'd3;
     end
     NPU_STATE_FC1_1:
     begin
@@ -594,7 +615,7 @@ begin
     NPU_STATE_WAIT_FC1_1_RESULT_WR:
     begin
         nxt_npu_state_r = (result_wr_wait_terminal_cnt_c) ? NPU_STATE_FC1_2 : NPU_STATE_WAIT_FC1_1_RESULT_WR;
-	npu_layer_in_progress = 3'd4;
+	    npu_layer_in_progress = 3'd4;
     end
     NPU_STATE_FC1_2:
     begin
@@ -604,37 +625,31 @@ begin
     NPU_STATE_WAIT_FC1_2_RESULT_WR:
     begin
         nxt_npu_state_r = (result_wr_wait_terminal_cnt_c) ? NPU_STATE_FC2 : NPU_STATE_WAIT_FC1_2_RESULT_WR;
-	npu_layer_in_progress = 3'd4;
+	    npu_layer_in_progress = 3'd4;
     end
     NPU_STATE_FC2:
     begin
-        nxt_npu_state_r = (fc2_terminal_cnt_c) ? NPU_STATE_WAIT_FC2_RESULT_WR : NPU_STATE_FC2;
-	npu_layer_in_progress = 3'd5;
-    end
-    NPU_STATE_WAIT_FC2_RESULT_WR:
-    begin
-        nxt_npu_state_r = (result_wr_wait_terminal_cnt_c) ? NPU_STATE_SOFTMAX : NPU_STATE_WAIT_FC2_RESULT_WR;
-	npu_layer_in_progress = 3'd5;
+        nxt_npu_state_r = (fc2_terminal_cnt_c) ? NPU_STATE_SOFTMAX : NPU_STATE_FC2;
+	    npu_layer_in_progress = 3'd5;
     end
     NPU_STATE_SOFTMAX:
     begin
         nxt_npu_state_r = (softmax_result_valid_p) ? NPU_STATE_DONE : NPU_STATE_SOFTMAX;
-	npu_layer_in_progress = 3'd6;
+	    npu_layer_in_progress = 3'd6;
     end
     NPU_STATE_DONE:
     begin
 	// be in DONE state till a new image write starts
         nxt_npu_state_r = (cfg_write_row_p) ? NPU_STATE_IDLE : NPU_STATE_DONE;
-	npu_layer_in_progress = 3'd7;
+	    npu_layer_in_progress = 3'd7;
     end
     default:
     begin
         nxt_npu_state_r = NPU_STATE_IDLE;
-	npu_layer_in_progress = 3'd0;
+	    npu_layer_in_progress = 3'd0;
     end
     endcase
 end
 
-end	
 
 endmodule
