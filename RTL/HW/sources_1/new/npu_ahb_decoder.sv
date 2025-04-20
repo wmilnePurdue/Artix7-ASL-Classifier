@@ -38,27 +38,24 @@ module npu_ahb_decoder(
     output logic [31:0]    ahb_s0_hrdata_o,
 
     output logic           write_row,
-    output logic [3:0]     halt_layer_num,
+    output logic [5:0]     npu_thrshld_num_rows_to_start,
 
     input  wire            npu_done,
     input  wire  [4:0]     npu_class_predicted,
     input  wire            npu_active,
-    input  wire            npu_halt,
-    input  wire            npu_layer_in_progress,
-    input  wire  [4:0]     img_num_rows_written,
-    input  wire            err_invalid_cpu_rd_wr,
-    input  wire            err_invalid_hw_rd_wr,
+    input  wire  [2:0]     npu_layer_in_progress,
+    input  wire  [5:0]     img_num_rows_written,
+    input  wire            mac_overflow_lat_r,
+    input  wire            act_overflow_lat_r,
 
     output logic [11:0]    mem0_addr_o,
     output logic           mem0_wr_o,
     output logic [7:0]     mem0_wrdata_o,
-
     input  wire  [7:0]     mem0_rddata_i,
 
     output logic [11:0]    mem1_addr_o,
     output logic           mem1_wr_o,
     output logic [7:0]     mem1_wrdata_o,
-
     input  wire  [7:0]     mem1_rddata_i
 );
 
@@ -74,33 +71,33 @@ state_t csr_state_nxt;
 
 logic [11:0] mem_prev_o;
 logic [1:0]  mem_prev_sel;
-logic [4:0]  rd_only_o;
+logic [5:0]  rd_only_o;
 logic        rw_reg_wr;
 
-wire [2:0]  rd_only_csr [4:0];
+wire [5:0]  rd_only_csr [7:0];
 
 assign mem0_addr_o    = mem0_wr_o ? mem_prev_o : ahb_s0_haddr_i[11:0];
 assign mem0_wrdata_o  = ahb_s0_hwdata_i[7:0];
 
-assign mem1_addr_o    = mem1_wr_o ? mem_prev_o[11:0] : ahb_s0_haddr_i[11:0];
+assign mem1_addr_o    = mem1_wr_o ? mem_prev_o : ahb_s0_haddr_i[11:0];
 assign mem1_wrdata_o  = ahb_s0_hwdata_i[7:0];
 
 assign ahb_s0_hresp_o = 1'b0;
 
-assign rd_only_csr[0] = {4'h0, npu_done};                // 0x8000_1000
-assign rd_only_csr[1] = npu_class_predicted;             // 0x8000_1004
-assign rd_only_csr[2] = {4'h0, npu_active};              // 0x8000_1008
-assign rd_only_csr[3] = {4'h0, npu_halt};                // 0x8000_100C
-assign rd_only_csr[4] = {4'h0, npu_layer_in_progress};   // 0x8000_1010
+assign rd_only_csr[0] = {5'h0, npu_done};                // 0x8000_1000
+assign rd_only_csr[1] = {1'b0, npu_class_predicted};     // 0x8000_1004
+assign rd_only_csr[2] = {5'h0, npu_active};              // 0x8000_1008
+assign rd_only_csr[3] = npu_thrshld_num_rows_to_start;   // 0x8000_100C
+assign rd_only_csr[4] = {3'h0, npu_layer_in_progress};   // 0x8000_1010
 assign rd_only_csr[5] = img_num_rows_written;            // 0x8000_1014
-assign rd_only_csr[6] = {4'h0, err_invalid_cpu_rd_wr};   // 0x8000_1018
-assign rd_only_csr[7] = {4'h0, err_invalid_hw_rd_wr};    // 0x8000_1020
+assign rd_only_csr[6] = {5'h0, mac_overflow_lat_r};      // 0x8000_1018
+assign rd_only_csr[7] = {5'h0, act_overflow_lat_r};      // 0x8000_1020
 
 always_comb begin
     ahb_s0_hrdata_o = 32'h0;
     case(mem_prev_sel)
-        2'b00: ahb_s0_hrdata_o[3:0] = halt_layer_num;
-        2'b01: ahb_s0_hrdata_o[4:0] = rd_only_o;
+        2'b00: ahb_s0_hrdata_o[5:0] = npu_thrshld_num_rows_to_start;
+        2'b01: ahb_s0_hrdata_o[5:0] = rd_only_o;
         2'b10: ahb_s0_hrdata_o[7:0] = mem0_rddata_i;
         2'b11: ahb_s0_hrdata_o[7:0] = mem1_rddata_i;
     endcase
@@ -120,16 +117,16 @@ end
 
 always_ff @ (posedge clk, negedge resetn) begin
     if(~resetn) begin
-        ahb_s0_hready_o <= 1'b1;
-        csr_state       <= IDLE;
-        mem_prev_o      <= 11'h0;
-        mem_prev_sel    <= 2'b00;
-        write_row       <= 1'b0;
-        halt_layer_num  <= 4'h0;
-        rd_only_o       <= 5'h0;
-        mem0_wr_o       <= 1'b0;
-        mem1_wr_o       <= 1'b0;
-        rw_reg_wr       <= 1'b0;
+        ahb_s0_hready_o                <= 1'b1;
+        csr_state                      <= IDLE;
+        mem_prev_o                     <= 12'h0;
+        mem_prev_sel                   <= 2'b00;
+        write_row                      <= 1'b0;
+        npu_thrshld_num_rows_to_start  <= 6'd0;
+        rd_only_o                      <= 6'h0;
+        mem0_wr_o                      <= 1'b0;
+        mem1_wr_o                      <= 1'b0;
+        rw_reg_wr                      <= 1'b0;
     end
     else begin
         csr_state <= csr_state_nxt;
@@ -137,7 +134,7 @@ always_ff @ (posedge clk, negedge resetn) begin
             write_row <= 1'b0;
             if(ahb_s0_htrans_i == HTRANS_NSEQ && ahb_s0_hwrite_i) begin
                 case(ahb_s0_haddr_i[13:12])
-                    2'b01: rw_reg_wr <= 1'b1;
+                    2'b00: rw_reg_wr <= 1'b1;
                     2'b10: mem0_wr_o <= 1'b1;
                     2'b11: mem1_wr_o <= 1'b1;
                 endcase
@@ -150,13 +147,13 @@ always_ff @ (posedge clk, negedge resetn) begin
         else begin
             if (rw_reg_wr) begin
                 case(mem_prev_o[2])
-                    1'b0: write_row      <= ahb_s0_hwdata_i[0];
-                    1'b1: halt_layer_num <= ahb_s0_hwdata_i[3:0];
+                    1'b0: write_row                     <= ahb_s0_hwdata_i[0];
+                    1'b1: npu_thrshld_num_rows_to_start <= ahb_s0_hwdata_i[5:0];
                 endcase
             end
             rw_reg_wr       <= 1'b0;
             mem0_wr_o       <= 1'b0;
-			mem1_wr_o       <= 1'b0;
+            mem1_wr_o       <= 1'b0;
             ahb_s0_hready_o <= 1'b1;
         end
     end

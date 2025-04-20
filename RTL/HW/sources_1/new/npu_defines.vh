@@ -14,15 +14,16 @@
 `define CONV3_NUM_OUT_PIXELS_DIV2_MINUS_1 4'd3
 
 `define LOG2_FILTER_MEM_ADDR_WIDTH  11
-`define LOG2_ACT_ADDR_WIDTH 13
+`define LOG2_ACT_ADDR_WIDTH 12
 
-`define INPUT_IMAGE_START_ADDR    13'h0
-`define CONV1_OUTPUT_START_ADDR   13'hC00
-`define CONV2_OUTPUT_START_ADDR   13'h1400
-`define CONV3_OUTPUT_START_ADDR   13'h1800
-`define FC1_1_OUTPUT_START_ADDR   13'h1A00
-`define FC1_2_OUTPUT_START_ADDR   13'h1A20
-`define FC2_OUTPUT_START_ADDR     13'h1B00
+`define INPUT_IMAGE_START_ADDR    12'h0
+// Separate memory for Input img and activations
+`define CONV1_OUTPUT_START_ADDR   12'h0
+`define CONV2_OUTPUT_START_ADDR   12'h800
+`define CONV3_OUTPUT_START_ADDR   12'hC00
+`define FC1_1_OUTPUT_START_ADDR   12'hE00
+`define FC1_2_OUTPUT_START_ADDR   12'hE20
+`define FC2_OUTPUT_START_ADDR     12'hF00
 
 `define CONV1_FILTER_START_ADDR   11'd0
 `define CONV1_FILTER_END_ADDR     11'd26
@@ -43,3 +44,17 @@
 `define FC1_1_FILTER_EN           32'hFFFF_FFFF
 `define FC1_2_FILTER_EN           32'hFFFF_FFFF
 `define FC2_FILTER_EN             32'hFF_FFFF
+
+`define CONV1_LAYER_ENC           3'd1
+`define CONV2_LAYER_ENC           3'd2
+`define CONV3_LAYER_ENC           3'd3
+`define FC1_1_LAYER_ENC           3'd4
+`define FC1_2_LAYER_ENC           3'd5
+`define FC2_LAYER_ENC             3'd6
+
+`define CONV1_NUM_PIXEL_OUT_PER_CH   9'd256
+`define CONV2_NUM_PIXEL_OUT_PER_CH   9'd64
+`define CONV3_NUM_PIXEL_OUT_PER_CH   9'd16
+`define FC1_1_NUM_PIXEL_OUT_PER_CH   9'd1
+`define FC1_2_NUM_PIXEL_OUT_PER_CH   9'd1
+`define FC2_NUM_PIXEL_OUT_PER_CH     9'd1

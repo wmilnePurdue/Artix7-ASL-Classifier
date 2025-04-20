@@ -40,61 +40,70 @@ module npu_top(
 );
 
 wire        write_row;
-wire [3:0]  halt_layer_num;
+wire [5:0]  npu_thrshld_num_rows_to_start;
 		    
 wire        npu_done;
 wire [4:0]  npu_class_predicted;
 wire        npu_active;
-wire        npu_halt;
-wire        npu_layer_in_progress;
-wire [4:0]  img_num_rows_written;
-wire        err_invalid_cpu_rd_wr;
-wire        err_invalid_hw_rd_wr;
+wire [2:0]  npu_layer_in_progress;
+wire [5:0]  img_num_rows_written;
+wire        mac_overflow_lat_r;
+wire        act_overflow_lat_r;
 
-wire [11:0] mem0_addr_o;
-wire        mem0_wr_o;
-wire [7:0]  mem0_wrdata_o;
-		    
-wire [7:0]  mem0_rddata_i;
-		    
-wire [11:0] mem1_addr_o;
-wire        mem1_wr_o;
-wire [7:0]  mem1_wrdata_o;
-		    
-wire [7:0]  mem1_rddata_i;
-
-// npu rgb mem interface
-wire        npu_rgb_wr_o;
-wire [11:0] npu_rgb_wr_addr_o;
-wire [7:0]  npu_rgb_wrdata_o;
-wire [7:0]  npu_rgb_rddata_i;
-
-// npu rgb mem interface
-wire        npu_act_wr_o;
-wire [11:0] npu_act_wr_addr_o;
-wire [7:0]  npu_act_wrdata_o;
-wire [7:0]  npu_act_rddata_i;
- 
+wire        softmax_result_valid_p;
+wire [4:0]  softmax_class_predicted;
+wire [31:0] mac_enable;
+wire [10:0] filter_mem_rd_addr;
+wire [12:0] activation_mem_rd_addr;
+wire [31:0] mac_overflow;
+wire [31:0] act_overflow;
+wire [11:0] cpu_rgb_mem_addr_o;
+wire [7:0]  cpu_rgb_mem_wrdata_o;
+wire [7:0]  cpu_rgb_mem_rddata_i;
+wire [11:0] npu_act_mem_wr_addr;
+wire [7:0]  npu_act_mem_wr_data;
+wire [7:0]  npu_rgb_rddata;
+wire [7:0]  npu_act_mem_rd_data;
+wire [7:0]  npu_muxed_rgb_act_mem_rd_data;
+wire [12*32-1:0] hw_mem_wr_addr;
+wire [8*32-1:0]  hw_mem_wr_data;
+wire [31:0] hw_mem_wr_ack_p;
+wire [31:0] hw_mem_wr;
 
 //temporary assignments to enable synthesis
-assign npu_done               = 'h0;
-assign npu_class_predicted    = 'h0;
-assign npu_active             = 'h0;
-assign npu_halt               = 'h0;
-assign npu_layer_in_progress  = 'h0;
-assign img_num_rows_written   = 'h0;
-assign err_invalid_cpu_rd_wr  = 'h0;
-assign err_invalid_hw_rd_wr   = 'h0;
 
-assign npu_rgb_wr_o           = 'h0;
-assign npu_rgb_wr_addr_o      = 'h0;
-assign npu_rgb_wrdata_o       = 'h0;
-assign npu_rgb_rddata_i       = 'h0;
-
-assign npu_act_wr_o           = 'h0;
-assign npu_act_wr_addr_o      = 'h0;
-assign npu_act_wrdata_o       = 'h0;
-assign npu_act_rddata_i       = 'h0;
+npu_control_unit npu_control_unit(
+   .npu_clk				(clk), 
+   .npu_rst_n				(resetn),
+   .cfg_write_row_p			(write_row), 
+   .cfg_thrshld_num_rows_to_start	(npu_thrshld_num_rows_to_start),
+   .softmax_result_valid_p		(softmax_result_valid_p), 
+   .softmax_class_predicted		(softmax_class_predicted),
+   .npu_active				(npu_active), 
+   .npu_done				(npu_done), 
+   .npu_layer_in_progress	        (npu_layer_in_progress), 
+   .img_num_rows_written	        (img_num_rows_written), 
+   .npu_class_predicted		        (npu_class_predicted),
+   .mac_enable			        (mac_enable), 
+   .mac_start_p			        (mac_start_p), 
+   .mac_last_p			        (mac_last_p),
+   .filter_mem_rd_en		        (), 
+   .filter_mem_rd_addr		        (filter_mem_rd_addr),
+   .rgb_mem_rd_en                       (rgb_mem_rd_en),
+   .activation_mem_rd_en	        (activation_mem_rd_en), 
+   .activation_mem_rd_addr	        (activation_mem_rd_addr), 
+   .activation_mem_rd_bypass            (activation_mem_rd_bypass),
+   .cur_state_conv1_c		        (), 
+   .cur_state_conv2_c		        (), 
+   .cur_state_conv3_c		        (),
+   .cur_state_fc1_1_c		        (), 
+   .cur_state_fc1_2_c		        (), 
+   .cur_state_fc2_c       	        (),
+   .mac_overflow                        (mac_overflow),
+   .mac_overflow_lat_r                  (mac_overflow_lat_r),
+   .act_overflow                        (act_overflow),
+   .act_overflow_lat_r                  (act_overflow_lat_r)
+   );
 
 npu_ahb_decoder DECODER (
     .clk                   (clk                    ), 
@@ -114,56 +123,114 @@ npu_ahb_decoder DECODER (
     .ahb_s0_hrdata_o       (ahb_s0_hrdata_o        ),
 
     .write_row             (write_row              ),
-    .halt_layer_num        (halt_layer_num         ),
+    .npu_thrshld_num_rows_to_start	(npu_thrshld_num_rows_to_start),
 
     .npu_done              (npu_done               ),
     .npu_class_predicted   (npu_class_predicted    ),
     .npu_active            (npu_active             ),
-    .npu_halt              (npu_halt               ),
     .npu_layer_in_progress (npu_layer_in_progress  ),
     .img_num_rows_written  (img_num_rows_written   ),
-    .err_invalid_cpu_rd_wr (err_invalid_cpu_rd_wr  ),
-    .err_invalid_hw_rd_wr  (err_invalid_hw_rd_wr   ),
+    .mac_overflow_lat_r    (mac_overflow_lat_r     ),
+    .act_overflow_lat_r    (act_overflow_lat_r     ),
 
-    .mem0_addr_o           (mem0_addr_o            ),
-    .mem0_wr_o             (mem0_wr_o              ),
-    .mem0_wrdata_o         (mem0_wrdata_o          ),
+    .mem0_addr_o           (cpu_rgb_mem_addr_o     ),
+    .mem0_wr_o             (cpu_rgb_mem_wr_o       ),
+    .mem0_wrdata_o         (cpu_rgb_mem_wrdata_o   ),
+    .mem0_rddata_i         (cpu_rgb_mem_rddata_i   ),
 
-    .mem0_rddata_i         (mem0_rddata_i          ),
-
-    .mem1_addr_o           (mem1_addr_o            ),
-    .mem1_wr_o             (mem1_wr_o              ),
-    .mem1_wrdata_o         (mem1_wrdata_o          ),
-
-    .mem1_rddata_i         (mem1_rddata_i          )
-);
+    .mem1_addr_o           (),
+    .mem1_wr_o             (),
+    .mem1_wrdata_o         (),
+    .mem1_rddata_i         (8'd0                   )
+    );
 
 npu_rgb_input_mem RGB_INPUT_MEM (
     .clka  (clk               ),
-    .wea   (mem0_wr_o         ),
-    .addra (mem0_addr_o       ),
-    .dina  (mem0_wrdata_o     ),
-    .douta (mem0_rddata_i     ),
+    .wea   (cpu_rgb_mem_wr_o  ), // CPU RGB mem wr port
+    .addra (cpu_rgb_mem_addr_o),
+    .dina  (cpu_rgb_mem_wrdata_o),
+    .douta (cpu_rgb_mem_rddata_i),
 						      
     .clkb  (clk               ),
-    .web   (npu_rgb_wr_o      ),
-    .addrb (npu_rgb_wr_addr_o ),
-    .dinb  (npu_rgb_wrdata_o  ),
-    .doutb (npu_rgb_rddata_i  )
-);
+    .web   (1'b0              ), // NPU only reads
+    .addrb (activation_mem_rd_addr[11:0]),
+    .dinb  (8'd0              ),
+    .doutb (npu_rgb_rddata    )
+   );
 
 npu_act_mem ACTIVATION_MEM (
     .clka  (clk               ),
-    .wea   (mem1_wr_o         ),
-    .addra (mem1_addr_o       ),
-    .dina  (mem1_wrdata_o     ),
-    .douta (mem1_rddata_i     ),
+    .wea   (npu_act_mem_wr_en ), // NPU Act Mem Wr Port
+    .addra (npu_act_mem_wr_addr[11:0]),
+    .dina  (npu_act_mem_wr_data),
+    .douta (),
 						      
     .clkb  (clk               ),
-    .web   (npu_act_wr_o      ),
-    .addrb (npu_act_wr_addr_o ),
-    .dinb  (npu_act_wrdata_o  ),
-    .doutb (npu_act_rddata_i  )
-);
+    .web   (1'b0              ), // NPU read port
+    .addrb (activation_mem_rd_addr[11:0]),
+    .dinb  (8'd0              ),
+    .doutb (npu_act_mem_rd_data)
+    );
+
+npu_img_act_mem_ctrl u_npu_img_act_mem_ctrl(
+    .clk                            (clk),
+    .resetn                         (resetn),
+    .hw_rgb_mem_rd                  (rgb_mem_rd_en),
+    .hw_act_mem_rd                  (activation_mem_rd_en),
+    .hw_act_mem_rd_bypass           (activation_mem_rd_bypass),
+    .npu_rgb_rddata                 (npu_rgb_rddata),
+    .npu_act_mem_rd_data            (npu_act_mem_rd_data),
+    .npu_muxed_rgb_act_mem_rd_data  (npu_muxed_rgb_act_mem_rd_data),
+    .npu_act_mem_wr_en              (npu_act_mem_wr_en),
+    .npu_act_mem_wr_addr            (npu_act_mem_wr_addr),
+    .npu_act_mem_wr_data            (npu_act_mem_wr_data),
+    .hw_mem_wr                      (hw_mem_wr),
+    .hw_mem_wr_addr                 (hw_mem_wr_addr), 
+    .hw_mem_wr_data                 (hw_mem_wr_data), 
+    .hw_mem_wr_ack_p                (hw_mem_wr_ack_p) 
+    );
+
+npu_layer u_npu_layer(
+   .clk			   (clk), 
+   .rst                    (resetn), 
+   .start_p 	           (mac_start_p),
+   .last_p                 (mac_last_p),
+   .mac_en		   (mac_enable), 
+   .weight_in              (weights_rom_rd_data), 
+   .act_in                 (npu_muxed_rgb_act_mem_rd_data), 
+   .mac_overflow           (mac_overflow), 
+   .npu_layer_in_progress  (npu_layer_in_progress), 
+   .hw_mem_wr              (hw_mem_wr), 
+   .hw_mem_wr_addr         (hw_mem_wr_addr), 
+   .hw_mem_wr_data         (hw_mem_wr_data), 
+   .hw_mem_wr_ack_p        (hw_mem_wr_ack_p), 
+   .bias_rd_addr	   (bias_rom_rd_addr), 
+   .bias_rd_data           (bias_rom_rd_data), 
+   .act_overflow	   (act_overflow),
+   .fc2_layer_output_data  (fc2_layer_output_data),
+   .fc2_layer_output_valid_p (fc2_layer_output_valid_p)
+    );
+
+npu_weights_rom_top u_npu_weights_rom_top(
+    .clk		    (clk), 
+    .weights_rom_rd_addr    (filter_mem_rd_addr), 
+    .weights_rom_rd_data    (weights_rom_rd_data)
+    );
+
+npu_bias_rom_top u_npu_bias_rom(
+    .clk		    (clk), 
+    .bias_rom_rd_addr       (bias_rom_rd_addr), 
+    .bias_rom_rd_data       (bias_rom_rd_data)
+    );
+
+softmax u_softmax(
+    .clk		   (clk),
+    .resetn                (resetn),
+    .data_in               (fc2_layer_output_data), 
+    .valid_i               (fc2_layer_output_valid_p),
+    .data_out              (),
+    .idx_out	           (softmax_class_predicted),
+    .valid_o               (softmax_result_valid_p)    
+    );
 
 endmodule
