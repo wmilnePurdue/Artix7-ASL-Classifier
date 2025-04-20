@@ -4,7 +4,7 @@
     "xci_name": "sync_fifo_ip",
     "component_reference": "xilinx.com:ip:fifo_generator:13.2",
     "ip_revision": "12",
-    "gen_directory": "../../../../HandDetect_SoC.gen/sources_1/ip/sync_fifo_ip",
+    "gen_directory": "../../../../../HandDetect_SoC/HandDetect_SoC.gen/sources_1/ip/sync_fifo_ip",
     "parameters": {
       "component_parameters": {
         "Component_Name": [ { "value": "sync_fifo_ip", "resolve_type": "user", "usage": "all" } ],
@@ -397,7 +397,7 @@
         "IPCONTEXT": [ { "value": "IP_Flow" } ],
         "IPREVISION": [ { "value": "12" } ],
         "MANAGED": [ { "value": "TRUE" } ],
-        "OUTPUTDIR": [ { "value": "../../../../HandDetect_SoC.gen/sources_1/ip/sync_fifo_ip" } ],
+        "OUTPUTDIR": [ { "value": "../../../../../HandDetect_SoC/HandDetect_SoC.gen/sources_1/ip/sync_fifo_ip" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],
         "SHAREDDIR": [ { "value": "." } ],
         "SWVERSION": [ { "value": "2024.2.1" } ],
