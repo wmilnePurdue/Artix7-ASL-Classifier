@@ -21,7 +21,8 @@
 
 
 module ov7670_gpio # (
-    parameter GPIO_WIDTH = 16
+    parameter OUTPUT_IO = 8,
+    parameter INPUT_IO  = 8
 )(
     input                  clk,
     input                  resetn,
@@ -41,9 +42,12 @@ module ov7670_gpio # (
 
     input  wire            cam_clk,
     input  wire            cam_clk_en,
+
+    // External-interface
     output logic           xclk,
 
-    inout [GPIO_WIDTH-1:0] gpio_io,
+    input  [INPUT_IO-1:0]  ext_input_io,
+    output [OUTPUT_IO-1:0] ext_output_io,
 
 	input  wire            p_clock,
 	input  wire            vsync,
@@ -61,9 +65,9 @@ wire [31:0]    rw_reg [RW_REG_CNT-1:0];
 wire [31:0]    r_reg  [R_REG_CNT-1:0];
 
 // GPIO
-wire [GPIO_WIDTH-1:0] gpio_write;
-wire [GPIO_WIDTH-1:0] gpio_status;
-wire [GPIO_WIDTH-1:0] gpio_read;
+wire [OUTPUT_IO-1:0] gpio_write;
+wire [INPUT_IO-1:0] gpio_clear;
+wire [INPUT_IO-1:0] gpio_read;
 
 // OV7670
 // I2C
@@ -85,20 +89,20 @@ wire                cont_read;
 
 // Memory Map assignment
 // R/W registers
-assign gpio_write   = rw_reg[0][GPIO_WIDTH-1:0];  // 0x4000_0000
-assign gpio_status  = rw_reg[1][GPIO_WIDTH-1:0];  // 0x4000_0004
-assign i2c_start_en = rw_reg[2][0];               // 0x4000_0008
-assign i2c_addr_i   = rw_reg[3][15:8];            // 0x4000_000C (upper)
-assign i2c_data_i   = rw_reg[3][7:0];             // 0x4000_000C (lower)
-assign delay_i      = rw_reg[4];                  // 0x4000_0010
-assign pxl_start_en = rw_reg[5][0];               // 0x4000_0014
-assign cont_read    = rw_reg[6][0];               // 0x4000_0018
+assign gpio_write   = rw_reg[0][OUTPUT_IO-1:0]; // 0x4000_0000
+assign gpio_clear   = rw_reg[1][INPUT_IO-1:0];  // 0x4000_0004
+assign i2c_start_en = rw_reg[2][0];             // 0x4000_0008
+assign i2c_addr_i   = rw_reg[3][15:8];          // 0x4000_000C (upper)
+assign i2c_data_i   = rw_reg[3][7:0];           // 0x4000_000C (lower)
+assign delay_i      = rw_reg[4];                // 0x4000_0010
+assign pxl_start_en = rw_reg[5][0];             // 0x4000_0014
+assign cont_read    = rw_reg[6][0];             // 0x4000_0018
 
-if(GPIO_WIDTH < 32) begin
-    assign r_reg[0][31:GPIO_WIDTH] = {(32-GPIO_WIDTH){1'b0}};
+if(INPUT_IO < 32) begin
+    assign r_reg[0][31:INPUT_IO] = {(32-INPUT_IO){1'b0}};
 end
-assign r_reg[0][GPIO_WIDTH-1:0] = gpio_read;             // 0x4008_0000
-assign r_reg[1]                 = {31'h0, i2c_ready_o};  // 0x4008_0004
+assign r_reg[0][INPUT_IO-1:0] = gpio_read;             // 0x4008_0000
+assign r_reg[1]               = {31'h0, i2c_ready_o};  // 0x4008_0004
 
 for (genvar i0 = 0; i0 < 32; i0++) begin
     assign r_reg[2 +      i0] =  {r_data[1][i0], r_data[0][i0]}; // 0x4008_0008 to 0x0008_0084
@@ -134,14 +138,18 @@ csr_regfile # (
 );
 
 gpio # (
-    .GPIO_WIDTH (GPIO_WIDTH )
+    .OUTPUT_IO  (OUTPUT_IO  ),
+    .INPUT_IO   (INPUT_IO   )
 ) GPIO_INST (
-												    
-    .gpio_write          (gpio_write                ),
-    .gpio_status         (gpio_status               ),
-    .gpio_read           (gpio_read                 ),
-			     			     
-    .gpio_io             (gpio_io                   )
+    .clk                 (clk           ),
+    .resetn              (resetn        ),
+									    
+    .ahbl_input_io       (gpio_read     ),
+    .ahbl_clear_input_io (gpio_clear    ),
+    .ahbl_output_io      (gpio_write    ),
+									    
+    .ext_input_io        (ext_input_io  ),
+    .ext_output_io       (ext_output_io )
 );
 
 ov7670 CAMERA_UNIT (

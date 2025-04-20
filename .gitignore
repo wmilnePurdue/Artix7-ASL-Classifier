@@ -1,2 +1,3 @@
 #Ignore Vivado project - make sure to update recreate.tcl if necessary
 HandDetect_SoC/
+Synth/SSD_TOP/ssd_synth_run/

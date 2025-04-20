@@ -4,7 +4,7 @@
     "xci_name": "npu_rgb_input_mem",
     "component_reference": "xilinx.com:ip:blk_mem_gen:8.4",
     "ip_revision": "10",
-    "gen_directory": "../../../../HandDetect_SoC.gen/sources_1/ip/npu_rgb_input_mem",
+    "gen_directory": "../../../../../HandDetect_SoC/HandDetect_SoC.gen/sources_1/ip/npu_rgb_input_mem",
     "parameters": {
       "component_parameters": {
         "Component_Name": [ { "value": "npu_rgb_input_mem", "resolve_type": "user", "usage": "all" } ],
@@ -174,7 +174,7 @@
         "IPCONTEXT": [ { "value": "IP_Flow" } ],
         "IPREVISION": [ { "value": "10" } ],
         "MANAGED": [ { "value": "TRUE" } ],
-        "OUTPUTDIR": [ { "value": "../../../../HandDetect_SoC.gen/sources_1/ip/npu_rgb_input_mem" } ],
+        "OUTPUTDIR": [ { "value": "../../../../../HandDetect_SoC/HandDetect_SoC.gen/sources_1/ip/npu_rgb_input_mem" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],
         "SHAREDDIR": [ { "value": "." } ],
         "SWVERSION": [ { "value": "2024.2.1" } ],

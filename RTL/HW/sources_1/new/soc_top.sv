@@ -25,7 +25,9 @@ module soc_top(
     input                   clk,
     input                   resetn,
 
-    inout [`GPIO_COUNT-1:0] gpio_io,
+    // External-interface
+    input  [`IN_IO-1:0]     ext_input_io,
+    output [`OUT_IO-1:0]    ext_output_io,
 
     output                  xclk,
 
@@ -188,7 +190,8 @@ ahb_interconnect BUS (
 );
 
 ov7670_gpio # (
-    .GPIO_WIDTH          (`GPIO_COUNT                 )
+    .OUTPUT_IO           (`OUT_IO                     ),
+    .INPUT_IO            (`IN_IO                      )
 ) CAMERA_UNIT (
     .clk                 (clk_int                     ), 
     .resetn              (resetn_int                  ),
@@ -208,9 +211,12 @@ ov7670_gpio # (
 
     .cam_clk             (cam_clk                     ),
     .cam_clk_en          (pll_en                      ),
+
+    // External-interface
     .xclk                (xclk                        ),
 
-    .gpio_io             (gpio_io                     ),
+    .ext_input_io        (ext_input_io                ),
+    .ext_output_io       (ext_output_io               ),
 
     .p_clock             (p_clock                     ),
     .vsync               (vsync                       ),
@@ -248,7 +254,6 @@ npu_top NPU (
 `endif
 
 `ifdef SPI_OUTPUT
-
 spi_io SPI_INTERFACE (
     .clk                 (clk_int                  ), 
     .resetn              (resetn_int               ),
@@ -273,7 +278,7 @@ spi_io SPI_INTERFACE (
     .csn                 (csn                      )
 );
 `elsif SSD_OUTPUT
-ssd_io SSD_INTERFACE(
+ssd_io SSD_INTERFACE (
     .clk(clk),
     .resetn(resetn),
     .ahb_s0_haddr_i      (ahb_out_unit_haddr_o     ),
