@@ -51,23 +51,30 @@ wire [4:0]  img_num_rows_written;
 wire        err_invalid_cpu_rd_wr;
 wire        err_invalid_hw_rd_wr;
 
-wire [12:0] mem_addr_o;
-wire        mem_wr_o;
-wire [7:0]  mem_wrdata_o;
+wire [11:0] mem0_addr_o;
+wire        mem0_wr_o;
+wire [7:0]  mem0_wrdata_o;
 		    
-wire [7:0]  mem_rddata_i;
+wire [7:0]  mem0_rddata_i;
 		    
-// wire [11:0] mem1_addr_o;
-// wire        mem1_wr_o;
-// wire [7:0]  mem1_wrdata_o;
-// 		    
-// wire [7:0]  mem1_rddata_i;
+wire [11:0] mem1_addr_o;
+wire        mem1_wr_o;
+wire [7:0]  mem1_wrdata_o;
+		    
+wire [7:0]  mem1_rddata_i;
 
-// npu mem interface
-wire        npu_mem_wr_o;
-wire [12:0] npu_mem_wr_addr_o;
-wire [7:0]  npu_mem_wrdata_o;
-wire [7:0]  npu_mem_rddata_i;
+// npu rgb mem interface
+wire        npu_rgb_wr_o;
+wire [11:0] npu_rgb_wr_addr_o;
+wire [7:0]  npu_rgb_wrdata_o;
+wire [7:0]  npu_rgb_rddata_i;
+
+// npu rgb mem interface
+wire        npu_act_wr_o;
+wire [11:0] npu_act_wr_addr_o;
+wire [7:0]  npu_act_wrdata_o;
+wire [7:0]  npu_act_rddata_i;
+ 
 
 //temporary assignments to enable synthesis
 assign npu_done               = 'h0;
@@ -79,10 +86,15 @@ assign img_num_rows_written   = 'h0;
 assign err_invalid_cpu_rd_wr  = 'h0;
 assign err_invalid_hw_rd_wr   = 'h0;
 
-assign npu_mem_wr_o           = 'h0;
-assign npu_mem_wr_addr_o      = 'h0;
-assign npu_mem_wrdata_o       = 'h0;
-assign npu_mem_rddata_i       = 'h0;
+assign npu_rgb_wr_o           = 'h0;
+assign npu_rgb_wr_addr_o      = 'h0;
+assign npu_rgb_wrdata_o       = 'h0;
+assign npu_rgb_rddata_i       = 'h0;
+
+assign npu_act_wr_o           = 'h0;
+assign npu_act_wr_addr_o      = 'h0;
+assign npu_act_wrdata_o       = 'h0;
+assign npu_act_rddata_i       = 'h0;
 
 npu_ahb_decoder DECODER (
     .clk                   (clk                    ), 
@@ -113,25 +125,45 @@ npu_ahb_decoder DECODER (
     .err_invalid_cpu_rd_wr (err_invalid_cpu_rd_wr  ),
     .err_invalid_hw_rd_wr  (err_invalid_hw_rd_wr   ),
 
-    .mem_addr_o            (mem_addr_o             ),
-    .mem_wr_o              (mem_wr_o               ),
-    .mem_wrdata_o          (mem_wrdata_o           ),
-												   
-    .mem_rddata_i          (mem_rddata_i           )
+    .mem0_addr_o           (mem0_addr_o            ),
+    .mem0_wr_o             (mem0_wr_o              ),
+    .mem0_wrdata_o         (mem0_wrdata_o          ),
+
+    .mem0_rddata_i         (mem0_rddata_i          ),
+
+    .mem1_addr_o           (mem1_addr_o            ),
+    .mem1_wr_o             (mem1_wr_o              ),
+    .mem1_wrdata_o         (mem1_wrdata_o          ),
+
+    .mem1_rddata_i         (mem1_rddata_i          )
 );
 
-npu_combined_mem NPU_CPU_COMMON_MEM (
+npu_rgb_input_mem RGB_INPUT_MEM (
     .clka  (clk               ),
-    .wea   (mem_wr_o          ),
-    .addra (mem_addr_o        ),
-    .dina  (mem_wrdata_o      ),
-    .douta (mem_rddata_i      ),
+    .wea   (mem0_wr_o         ),
+    .addra (mem0_addr_o       ),
+    .dina  (mem0_wrdata_o     ),
+    .douta (mem0_rddata_i     ),
 						      
     .clkb  (clk               ),
-    .web   (npu_mem_wr_o      ),
-    .addrb (npu_mem_wr_addr_o ),
-    .dinb  (npu_mem_wrdata_o  ),
-    .doutb (npu_mem_rddata_i  )
+    .web   (npu_rgb_wr_o      ),
+    .addrb (npu_rgb_wr_addr_o ),
+    .dinb  (npu_rgb_wrdata_o  ),
+    .doutb (npu_rgb_rddata_i  )
+);
+
+npu_act_mem ACTIVATION_MEM (
+    .clka  (clk               ),
+    .wea   (mem1_wr_o         ),
+    .addra (mem1_addr_o       ),
+    .dina  (mem1_wrdata_o     ),
+    .douta (mem1_rddata_i     ),
+						      
+    .clkb  (clk               ),
+    .web   (npu_act_wr_o      ),
+    .addrb (npu_act_wr_addr_o ),
+    .dinb  (npu_act_wrdata_o  ),
+    .doutb (npu_act_rddata_i  )
 );
 
 endmodule
