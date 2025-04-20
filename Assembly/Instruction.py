@@ -97,13 +97,13 @@ class Instruction:
             const = append_string(const, 15)
             inst = int(opcode + src0 + src1 + dest + const, 2)
         elif (self.inst_type == InstType.SRR) or (self.inst_type == InstType.SLL):
-            const = append_string(const, 13)
+            const = append_string(const, 14)
             if self.option:
-                const = append_string(self.src1, 13)
+                const = append_string(self.src1, 14)
                 src1 = "0000"
             else:
                 src1 = append_string(getregbin(self.src1),4)
-            inst = int(opcode + src0 + src1 + dest + const, 2)
+            inst = int(opcode + src0 + src1 + dest + str(self.option) + const, 2)
         elif (self.inst_type == InstType.JEQ) or (self.inst_type == InstType.JNEQ) or (self.inst_type == InstType.JLT) or (self.inst_type == InstType.JGR):
             if self.const_value == -1:
                 raise Exception("ERROR: Jump Location, " + self.const_string + ", not found")

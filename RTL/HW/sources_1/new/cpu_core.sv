@@ -141,6 +141,7 @@ cpu_decode_issue DECODE_ISSUE (
     .jump_addr_o   (jump_addr          ),
     .pc_o          (nxt_pc_passthrough )
 );
+
 cpu_execute_mem ALUMEM (
     .clk            (clk                  ),
     .resetn         (resetn               ),

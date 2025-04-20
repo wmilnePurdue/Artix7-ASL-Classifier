@@ -33,7 +33,7 @@ bound NPU_RED_LO  0x2000
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; RGB_DIVISOR
-bound RGB_DIVISOR 28
+bound RGB_DIVISOR 27
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I2C initialization values
@@ -192,20 +192,14 @@ lsl r15,z,0xFFFF
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 lss r0,z, $I2C_WR_ADDR_HI
-
 lsl r1,z,$I2C_DELAY_LINE
 stosw r1,r0,+16
+
+lsl r8,z,0
 
 ;; Reset OV7670
 lsl r1,z,$I2C_RESET
 call r15,WRITE_I2C_WITH_REGISTER
-
-;; delay
-lsl r1,z,$I2C_RESET_DELAY
-lsl r8,z,0
-I2C_RESET_LOOP:
-sub r1,r1,1
-jne r1,r8,I2C_RESET_LOOP
 
 ;; Set OV7670 to RGB output
 lsl r1,z,$I2C_SET_RGB_OUT
@@ -404,6 +398,9 @@ call r15,WRITE_I2C_WITH_REGISTER
 lsl r1,z,$I2C_HAECC7
 call r15,WRITE_I2C_WITH_REGISTER
 
+;; -- DO NOT delete this line ---
+;; -- it's being used by in testbench by OV7670 
+;;    to start image transmission
 ;; Enable AGC/AEC
 lsl r1,z,$I2C_COM8_AGC_AEC
 call r15,WRITE_I2C_WITH_REGISTER
@@ -423,6 +420,20 @@ call r15,WRITE_I2C_WITH_REGISTER
 ;; r9 - shift value
 
 MAIN_ROUTINE_START:
+;; POLL if GPIO has triggered
+lss r0,z,0x4008
+lsl r1,z,0x00FF
+lsl r2,z,0
+lodsw r0,r3,+0
+and r3,r3,r1
+je r3,r2,MAIN_ROUTINE_START
+lss r0,z,0x4000
+lsl r1,z,1
+stosw r1,r0,+4
+stosw r2,r0,+4
+
+;; START Camera/NPU processing
+
 lsl r0,nz,$START_PXL_LO
 lss r0,nz,$START_PXL_HI
 lsl r1,z,0
@@ -468,6 +479,11 @@ sub r3,r3,2048
 add r1,r1,1
 jne r8,r1,START_ROW_DETECT
 
+;; trigger npu
+;; write SSD
+
+;; Poll the push button
+jmp MAIN_ROUTINE_START
 LOOP_HERE:
 jmp LOOP_HERE
 
@@ -488,11 +504,20 @@ POLL_I2C_LOOP:
 lodsw r0,r2,+4
 jne r2,r1,POLL_I2C_LOOP
 lss r0,nz,0x4000
+;; delay
+lsl r1,z,$I2C_RESET_DELAY
+I2C_DELAY_LOOP:
+sub r1,r1,1
+jne r1,r8,I2C_DELAY_LOOP
 ret r15
 
 STORE_RESULT:
 lodsw r0,r6,+0
+;; Mask upper or lower values
 and r6,r6,r5
+;; Shift to right 
+shr r6,r6,r9
+;; Apply divide normalization
 div r6,r6,r4,q
 stosw r6,r3,+0
 je r0,r7,END_STORE

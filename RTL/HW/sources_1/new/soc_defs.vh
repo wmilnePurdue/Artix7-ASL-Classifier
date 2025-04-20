@@ -3,8 +3,8 @@
 `define __SOC_DEFS__
 
 `define USE_PLL
-`define GPIO_COUNT 10
-//`define SPI_OUTPUT
+`define OUT_IO 8
+`define IN_IO 8
 `define SSD_OUTPUT
 `define NPU_ACCELERATOR
 
