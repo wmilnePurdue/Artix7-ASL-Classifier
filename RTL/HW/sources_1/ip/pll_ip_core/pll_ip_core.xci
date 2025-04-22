@@ -3,7 +3,7 @@
   "ip_inst": {
     "xci_name": "pll_ip_core",
     "component_reference": "xilinx.com:ip:clk_wiz:6.0",
-    "ip_revision": "15",
+    "ip_revision": "14",
     "gen_directory": "../../../../HandDetect_SoC.gen/sources_1/ip/pll_ip_core",
     "parameters": {
       "component_parameters": {
@@ -584,9 +584,10 @@
       },
       "project_parameters": {
         "ARCHITECTURE": [ { "value": "artix7" } ],
-        "BASE_BOARD_PART": [ { "value": "digilentinc.com:basys3:part0:1.2" } ],
+        "BASE_BOARD_PART": [ { "value": "" } ],
         "BOARD_CONNECTIONS": [ { "value": "" } ],
         "DEVICE": [ { "value": "xc7a35t" } ],
+        "NEXTGEN_VERSAL": [ { "value": "0" } ],
         "PACKAGE": [ { "value": "cpg236" } ],
         "PREFHDL": [ { "value": "VERILOG" } ],
         "SILICON_REVISION": [ { "value": "" } ],
@@ -597,12 +598,12 @@
       },
       "runtime_parameters": {
         "IPCONTEXT": [ { "value": "IP_Flow" } ],
-        "IPREVISION": [ { "value": "15" } ],
+        "IPREVISION": [ { "value": "14" } ],
         "MANAGED": [ { "value": "TRUE" } ],
         "OUTPUTDIR": [ { "value": "../../../../HandDetect_SoC.gen/sources_1/ip/pll_ip_core" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],
         "SHAREDDIR": [ { "value": "." } ],
-        "SWVERSION": [ { "value": "2024.2.1" } ],
+        "SWVERSION": [ { "value": "2024.1" } ],
         "SYNTHESISFLOW": [ { "value": "OUT_OF_CONTEXT" } ]
       }
     },

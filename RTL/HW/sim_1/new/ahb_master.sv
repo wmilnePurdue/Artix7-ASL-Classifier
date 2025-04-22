@@ -64,11 +64,14 @@ initial begin
     ahb_hwdata_o     <= '0;
     @(posedge resetn);
     @(posedge clk);
-    //ahb_write(32'h8000_2000, $urandom_range(8'h00, 8'hFF));
-    //ahb_read(32'h8000_2000);
+    ahb_write(32'h8000_0004, 8'h1);
+    ahb_write(32'h8000_0000, 8'h1);
+    ahb_read(32'h8000_2000);
     /* perform test writes and reads here */
-
-    //$finish;
+    repeat (50000) begin
+       @(posedge clk);
+    end
+    $finish;
 end
 
 task ahb_write(input [31:0] addr, input [31:0] wdata);
