@@ -84,9 +84,9 @@ wire [11:0] layer_act_mem_start_addr_offset_c =
 // Add bias to MAC output
 wire signed [DATA_WIDTH-1:0] mac_plus_bias_c = mac_out + bias_rd_data;
 
-always @ (posedge clk)
+always @ (posedge clk, negedge rst)
 begin
-   if (rst) begin
+   if (~rst) begin
        max_result_r     <= {DATA_WIDTH{1'b0}};
        mac_plus_bias_r  <= {(DATA_WIDTH+1){1'b0}};
        mod4_cnt         <= 2'd0;
@@ -100,7 +100,9 @@ begin
        prod_num_of_output_pixel_per_ch_r_times_ch_num <= 12'd0;
        start_addr_offset_per_ch_r  <= 13'd0;
 	   fc2_layer_output_valid_p <= 1'b0;
+       npu_layer_in_progress_r1 <= 3'h0;
    end else begin
+       npu_layer_in_progress_r1 <= npu_layer_in_progress;
        mac_valid_r1     <= mac_valid;
        layer_act_mem_start_addr_offset_r              <= layer_act_mem_start_addr_offset_c;
        prod_num_of_output_pixel_per_ch_r_times_ch_num <= num_of_output_pixel_per_ch_c * ch_num;

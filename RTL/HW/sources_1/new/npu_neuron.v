@@ -57,6 +57,10 @@ output wire [7:0] fc2_layer_output_data;
 output wire fc2_layer_output_valid_p;
 
 
+// Adding wire connections
+wire [7:0] mac_out;
+
+
 npu_mac u_npu_mac(
    .clk                      (clk), 
    .rst                      (rst), 

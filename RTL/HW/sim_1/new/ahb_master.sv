@@ -64,14 +64,23 @@ initial begin
     ahb_hwdata_o     <= '0;
     @(posedge resetn);
     @(posedge clk);
-    ahb_write(32'h8000_0004, 8'h1);
-    ahb_write(32'h8000_0000, 8'h1);
-    ahb_read(32'h8000_2000);
+    // ahb_write(32'h8000_0004, 8'h1);
+    // ahb_write(32'h8000_0000, 8'h1);
+    // ahb_read(32'h8000_2000);
     /* perform test writes and reads here */
-    repeat (50000) begin
-       @(posedge clk);
+    ahb_write(32'h8000_0004,32'd32);
+    for(integer i0 = 0; i0 < 32; i0 = i0+1) begin
+        for(integer i1 = 0; i1 < 32; i1 = i1 + 1) begin
+            ahb_write(32'h8000_2000 + i0*32 + i1, $urandom_range(8'h00, 8'hFF)); 
+            ahb_write(32'h8000_2400 + i0*32 + i1, $urandom_range(8'h00, 8'hFF)); 
+            ahb_write(32'h8000_2800 + i0*32 + i1, $urandom_range(8'h00, 8'hFF)); 
+        end
+        ahb_write(32'h8000_0000, 32'h1);
     end
-    $finish;
+    ahb_read(32'h8000_1000);
+    while(rd_data[0] != 1'b1) ahb_read(32'h8000_1000);
+    ahb_read(32'h8000_1004);
+    $stop;
 end
 
 task ahb_write(input [31:0] addr, input [31:0] wdata);

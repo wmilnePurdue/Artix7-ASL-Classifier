@@ -53,9 +53,9 @@ wire [2*DATA_WIDTH-1:0] partial_sum_c = mult_r + mux_sum_in0_c;
 wire [2*DATA_WIDTH-1:0] final_sum_c = (partial_sum_r >>> NUM_FRAC_BITS);
 assign  mac_out     = final_sum_c[DATA_WIDTH-1:0];
 
-always @ (posedge clk)
+always @ (posedge clk, negedge rst)
 begin
-    if (rst) begin
+    if (~rst) begin
         mult_r        <= {2*DATA_WIDTH{1'b0}}; 
         partial_sum_r <= {(2*DATA_WIDTH+1){1'b0}};
         start_r1      <= 1'b0;

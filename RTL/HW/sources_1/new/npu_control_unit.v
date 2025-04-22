@@ -188,7 +188,7 @@ wire conv_termnical_cnt_c = (quad_op_row_cnt == quad_row_col_cnt_max_minus_1) & 
 		            (quad_op_rel_cnt == 2'd3) & output_pixel_comp_boundary_c;			     
 
 // Below counters define boundary of Conv Layer operations
-always @ (posedge npu_clk or negedge npu_rst_n) 
+always @ (posedge npu_clk, negedge npu_rst_n) 
 begin
 if (~npu_rst_n) begin
     filter_row_cnt_r                   <= 2'd0;
@@ -311,7 +311,7 @@ wire [3:0] filter_num_in_ch_cnt_max_minus_1_r1_c = (cur_state_conv1_pipeline_r[0
                                             (cur_state_conv2_pipeline_r[0]) ? `CONV2_NUM_INPUT_CH_MINUS_1 :
                                             `CONV3_NUM_INPUT_CH_MINUS_1 ;    
 
-always @ (posedge npu_clk or negedge npu_rst_n) 
+always @ (posedge npu_clk, negedge npu_rst_n) 
 begin
 if (~npu_rst_n) begin
     op_rel_row_cnt_without_pad   <= 2'd0;
@@ -379,57 +379,63 @@ wire fc2_terminal_cnt_c = (fc2_act_cnt == 6'd63);
 
 wire result_wr_wait_terminal_cnt_c = (result_wr_wait_cnt == 6'd63);
 
-always @ (posedge npu_clk or negedge npu_rst_n) 
-begin
-if (~npu_rst_n) begin
-    fc1_row_cnt    <= 2'd0;
-    fc1_col_cnt    <= 2'd0;
-    fc1_inp_ch_cnt <= 5'd0;
-    fc2_act_cnt    <= 6'd0;   
-    result_wr_wait_cnt <= 6'd0;   
-end else begin
-    if (cur_state_fc1_1_c | cur_state_fc1_2_c) begin
-        if (fc1_row_cnt == 2'd3) begin
-            fc1_row_cnt  <= 2'd0;
-            if (fc1_col_cnt == 2'd3) begin
-                fc1_col_cnt <= 2'd0;
-                if (fc1_inp_ch_cnt == 5'd23) begin
-                    fc1_inp_ch_cnt <= 5'd0;
-                end else begin
-                    fc1_inp_ch_cnt <= fc1_inp_ch_cnt + 5'd1;
-                end
-            end else begin
-                fc1_col_cnt <= fc1_col_cnt + 2'd1;
-            end
-        end else begin
-            fc1_row_cnt  <= fc1_row_cnt + 2'd1;        
-        end
-     end else begin
+always @ (posedge npu_clk, negedge npu_rst_n)  begin
+    if (~npu_rst_n) begin
         fc1_row_cnt    <= 2'd0;
         fc1_col_cnt    <= 2'd0;
-        fc1_inp_ch_cnt <= 5'd0;       
-     end
-   end
-   // FC2 - read activation linearly 
-   if (cur_state_fc2_c) begin
-       if (fc2_act_cnt < 6'd63) begin
-           fc2_act_cnt <= fc2_act_cnt + 6'd1;
-       end
-   end else begin
-       fc2_act_cnt <= 6'd0;
-   end  
-   
-   if (cur_state_wait_conv1_result_wr_c | cur_state_wait_conv2_result_wr_c | cur_state_wait_conv3_result_wr_c |
-       cur_state_wait_fc1_1_result_wr_c | cur_state_wait_fc1_2_result_wr_c) begin
-       result_wr_wait_cnt <= result_wr_wait_cnt + 6'd1;
-   end else begin
-       result_wr_wait_cnt <= 6'd0;
-   end     
-end          
+        fc1_inp_ch_cnt <= 5'd0;
+        fc2_act_cnt    <= 6'd0;   
+        result_wr_wait_cnt <= 6'd0;   
+    end 
+    else begin
+        if (cur_state_fc1_1_c | cur_state_fc1_2_c) begin
+            if (fc1_row_cnt == 2'd3) begin
+                fc1_row_cnt  <= 2'd0;
+                if (fc1_col_cnt == 2'd3) begin
+                    fc1_col_cnt <= 2'd0;
+                    if (fc1_inp_ch_cnt == 5'd23) begin
+                        fc1_inp_ch_cnt <= 5'd0;
+                    end 
+                    else begin
+                        fc1_inp_ch_cnt <= fc1_inp_ch_cnt + 5'd1;
+                    end
+                end 
+                else begin
+                    fc1_col_cnt <= fc1_col_cnt + 2'd1;
+                end
+            end 
+            else begin
+                fc1_row_cnt  <= fc1_row_cnt + 2'd1;        
+            end
+        end 
+        else begin
+            fc1_row_cnt    <= 2'd0;
+            fc1_col_cnt    <= 2'd0;
+            fc1_inp_ch_cnt <= 5'd0;       
+        end
+    
+        // FC2 - read activation linearly 
+        if (cur_state_fc2_c) begin
+            if (fc2_act_cnt < 6'd63) begin
+                fc2_act_cnt <= fc2_act_cnt + 6'd1;
+            end
+        end else begin
+            fc2_act_cnt <= 6'd0;
+        end  
+        
+        if (cur_state_wait_conv1_result_wr_c | cur_state_wait_conv2_result_wr_c | cur_state_wait_conv3_result_wr_c |
+            cur_state_wait_fc1_1_result_wr_c | cur_state_wait_fc1_2_result_wr_c) begin
+            result_wr_wait_cnt <= result_wr_wait_cnt + 6'd1;
+        end else begin
+            result_wr_wait_cnt <= 6'd0;
+        end   
+    end
+end
+  
+        
 
 // pipelining
-always @ (posedge npu_clk or negedge npu_rst_n) 
-begin
+always @ (posedge npu_clk, negedge npu_rst_n) begin
  if (~npu_rst_n) begin
    cur_state_conv1_pipeline_r     <= 4'd0;
    cur_state_conv2_pipeline_r     <= 4'd0;
@@ -458,7 +464,8 @@ begin
    fc2_act_cnt_r1                 <= 6'd0;
    fc2_act_cnt_r2                 <= 6'd0;
    filter_row_cnt_r1              <= 2'd0;
-end else begin
+ end 
+ else begin
    cur_state_conv1_pipeline_r     <= {cur_state_conv1_pipeline_r[2:0],cur_state_conv1_c};
    cur_state_conv2_pipeline_r     <= {cur_state_conv2_pipeline_r[2:0],cur_state_conv2_c};
    cur_state_conv3_pipeline_r     <= {cur_state_conv3_pipeline_r[2:0],cur_state_conv3_c};
@@ -550,7 +557,7 @@ wire [`LOG2_ACT_ADDR_WIDTH-1:0] activation_mem_rd_addr_rel_mux_r2_c = (cur_state
 								       fc1_act_mem_rd_addr_r2 : fc2_act_cnt_r2;  
                                                                    
 
-always @ (posedge npu_clk or negedge npu_rst_n) 
+always @ (posedge npu_clk, negedge npu_rst_n) 
 begin
   if (~npu_rst_n) begin
       filter_mem_rd_en       <= 32'd0; // active high per 32 banks read enable

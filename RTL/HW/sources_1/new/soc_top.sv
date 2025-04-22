@@ -279,8 +279,8 @@ spi_io SPI_INTERFACE (
 );
 `elsif SSD_OUTPUT
 ssd_io SSD_INTERFACE (
-    .clk(clk),
-    .resetn(resetn),
+    .clk                 (clk_int                  ),
+    .resetn              (resetn                   ),
     .ahb_s0_haddr_i      (ahb_out_unit_haddr_o     ),
     .ahb_s0_hwrite_i     (ahb_out_unit_hwrite_o    ),
     .ahb_s0_hsize_i      (ahb_out_unit_hsize_o     ),

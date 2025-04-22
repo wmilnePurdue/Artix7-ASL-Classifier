@@ -70,39 +70,45 @@ wire [8*32-1:0]  hw_mem_wr_data;
 wire [31:0] hw_mem_wr_ack_p;
 wire [31:0] hw_mem_wr;
 
+wire [32*8-1:0] weights_rom_rd_data;
+wire [32*8-1:0] bias_rom_rd_data;
+wire [2:0]      bias_rom_rd_addr; 
+wire [24*8-1:0] fc2_layer_output_data;
+wire            fc2_layer_output_valid_p;
+
 //temporary assignments to enable synthesis
 
-npu_control_unit npu_control_unit(
-   .npu_clk				(clk), 
-   .npu_rst_n				(resetn),
-   .cfg_write_row_p			(write_row), 
-   .cfg_thrshld_num_rows_to_start	(npu_thrshld_num_rows_to_start),
-   .softmax_result_valid_p		(softmax_result_valid_p), 
-   .softmax_class_predicted		(softmax_class_predicted),
-   .npu_active				(npu_active), 
-   .npu_done				(npu_done), 
-   .npu_layer_in_progress	        (npu_layer_in_progress), 
-   .img_num_rows_written	        (img_num_rows_written), 
-   .npu_class_predicted		        (npu_class_predicted),
-   .mac_enable			        (mac_enable), 
-   .mac_start_p			        (mac_start_p), 
-   .mac_last_p			        (mac_last_p),
-   .filter_mem_rd_en		        (), 
-   .filter_mem_rd_addr		        (filter_mem_rd_addr),
-   .rgb_mem_rd_en                       (rgb_mem_rd_en),
-   .activation_mem_rd_en	        (activation_mem_rd_en), 
-   .activation_mem_rd_addr	        (activation_mem_rd_addr), 
-   .activation_mem_rd_bypass            (activation_mem_rd_bypass),
-   .cur_state_conv1_c		        (), 
-   .cur_state_conv2_c		        (), 
-   .cur_state_conv3_c		        (),
-   .cur_state_fc1_1_c		        (), 
-   .cur_state_fc1_2_c		        (), 
-   .cur_state_fc2_c       	        (),
-   .mac_overflow                        (mac_overflow),
-   .mac_overflow_lat_r                  (mac_overflow_lat_r),
-   .act_overflow                        (act_overflow),
-   .act_overflow_lat_r                  (act_overflow_lat_r)
+npu_control_unit NPU_CTRL(
+   .npu_clk				          (clk), 
+   .npu_rst_n				      (resetn),
+   .cfg_write_row_p			      (write_row), 
+   .cfg_thrshld_num_rows_to_start (npu_thrshld_num_rows_to_start),
+   .softmax_result_valid_p		  (softmax_result_valid_p), 
+   .softmax_class_predicted		  (softmax_class_predicted),
+   .npu_active				      (npu_active), 
+   .npu_done				      (npu_done), 
+   .npu_layer_in_progress	      (npu_layer_in_progress), 
+   .img_num_rows_written	      (img_num_rows_written), 
+   .npu_class_predicted		      (npu_class_predicted),
+   .mac_enable			          (mac_enable), 
+   .mac_start_p			          (mac_start_p), 
+   .mac_last_p			          (mac_last_p),
+   .filter_mem_rd_en		      (), 
+   .filter_mem_rd_addr		      (filter_mem_rd_addr),
+   .rgb_mem_rd_en                 (rgb_mem_rd_en),
+   .activation_mem_rd_en	      (activation_mem_rd_en), 
+   .activation_mem_rd_addr	      (activation_mem_rd_addr), 
+   .activation_mem_rd_bypass      (activation_mem_rd_bypass),
+   .cur_state_conv1_c		      (), 
+   .cur_state_conv2_c		      (), 
+   .cur_state_conv3_c		      (),
+   .cur_state_fc1_1_c		      (), 
+   .cur_state_fc1_2_c		      (), 
+   .cur_state_fc2_c       	      (),
+   .mac_overflow                  (mac_overflow),
+   .mac_overflow_lat_r            (mac_overflow_lat_r),
+   .act_overflow                  (act_overflow),
+   .act_overflow_lat_r            (act_overflow_lat_r)
    );
 
 npu_ahb_decoder DECODER (
@@ -172,7 +178,7 @@ npu_act_mem ACTIVATION_MEM (
     .doutb (npu_act_mem_rd_data)
     );
 
-npu_img_act_mem_ctrl u_npu_img_act_mem_ctrl(
+npu_img_act_mem_ctrl NPU_IMG_ACT_CTRL(
     .clk                            (clk),
     .resetn                         (resetn),
     .hw_rgb_mem_rd                  (rgb_mem_rd_en),
@@ -190,40 +196,40 @@ npu_img_act_mem_ctrl u_npu_img_act_mem_ctrl(
     .hw_mem_wr_ack_p                (hw_mem_wr_ack_p) 
     );
 
-npu_layer u_npu_layer(
-   .clk			   (clk), 
-   .rst                    (resetn), 
-   .start_p 	           (mac_start_p),
-   .last_p                 (mac_last_p),
-   .mac_en		   (mac_enable), 
-   .weight_in              (weights_rom_rd_data), 
-   .act_in                 (npu_muxed_rgb_act_mem_rd_data), 
-   .mac_overflow           (mac_overflow), 
-   .npu_layer_in_progress  (npu_layer_in_progress), 
-   .hw_mem_wr              (hw_mem_wr), 
-   .hw_mem_wr_addr         (hw_mem_wr_addr), 
-   .hw_mem_wr_data         (hw_mem_wr_data), 
-   .hw_mem_wr_ack_p        (hw_mem_wr_ack_p), 
-   .bias_rd_addr	   (bias_rom_rd_addr), 
-   .bias_rd_data           (bias_rom_rd_data), 
-   .act_overflow	   (act_overflow),
-   .fc2_layer_output_data  (fc2_layer_output_data),
+npu_layer NPU_LAYER_UNIT(
+   .clk			             (clk),    
+   .rst                      (resetn), 
+   .start_p 	             (mac_start_p),
+   .last_p                   (mac_last_p),
+   .mac_en		             (mac_enable), 
+   .weight_in                (weights_rom_rd_data), 
+   .act_in                   (npu_muxed_rgb_act_mem_rd_data), 
+   .mac_overflow             (mac_overflow), 
+   .npu_layer_in_progress    (npu_layer_in_progress), 
+   .hw_mem_wr                (hw_mem_wr), 
+   .hw_mem_wr_addr           (hw_mem_wr_addr), 
+   .hw_mem_wr_data           (hw_mem_wr_data), 
+   .hw_mem_wr_ack_p          (hw_mem_wr_ack_p), 
+   .bias_rd_addr	         (bias_rom_rd_addr), 
+   .bias_rd_data             (bias_rom_rd_data), 
+   .act_overflow	         (act_overflow),
+   .fc2_layer_output_data    (fc2_layer_output_data),
    .fc2_layer_output_valid_p (fc2_layer_output_valid_p)
     );
 
-npu_weights_rom_top u_npu_weights_rom_top(
+npu_weights_rom_top NPU_WEIGHTS_ROM(
     .clk		    (clk), 
     .weights_rom_rd_addr    (filter_mem_rd_addr), 
     .weights_rom_rd_data    (weights_rom_rd_data)
     );
 
-npu_bias_rom_top u_npu_bias_rom(
+npu_bias_rom_top NPU_BIAS_ROM(
     .clk		    (clk), 
     .bias_rom_rd_addr       (bias_rom_rd_addr), 
     .bias_rom_rd_data       (bias_rom_rd_data)
     );
 
-softmax u_softmax(
+softmax SFTMAX(
     .clk		   (clk),
     .resetn                (resetn),
     .data_in               (fc2_layer_output_data), 
