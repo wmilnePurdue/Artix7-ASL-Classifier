@@ -39,8 +39,8 @@ bound RGB_DIVISOR 218
 ;; I2C initialization values
 ;; Target Clock = 400kHz
 ;; Input Clock = 116MHz
-;; I2C delay line = (116 MHz / 400 kHz) = 290 -> 
-bound I2C_DELAY_LINE    0x122
+;; I2C delay line = (100 MHz / 400 kHz) = 250 -> 
+bound I2C_DELAY_LINE    250
 bound I2C_RESET_DELAY   0x1000
 
 ;; I2C Registers to write
@@ -191,7 +191,11 @@ lsl r15,z,0xFFFF
 ;; ** Initialize I2C
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-lss r0,z, $I2C_WR_ADDR_HI
+lss r0,z,0x4000
+lsl r1,z,1
+stosw r1,r0,+0
+
+lss r0,z,$I2C_WR_ADDR_HI
 lsl r1,z,$I2C_DELAY_LINE
 stosw r1,r0,+16
 
@@ -452,7 +456,7 @@ lsl r3,nz,$NPU_RED_LO
 lsl r4,z,$RGB_DIVISOR
 lss r5,z,$MASK_DATA
 lss r7,nz,0x4008
-lss r8,z,33
+lsl r8,z,33
 
 START_ROW_DETECT:
 lss r0,z,$ROW_READ_HI
@@ -504,9 +508,9 @@ jne r1,r2,POLL_NPU_DONE
 lodsw r0,r1,+4
 ;; Write to SSD
 lss r0,z,0xC000
-stosw r0,r1,+0
+stosw r1,r0,+0
 lsl r1,z,1
-stosw r0,r1,+4
+stosw r1,r0,+4
 
 ;; Poll the push button
 jmp MAIN_ROUTINE_START
