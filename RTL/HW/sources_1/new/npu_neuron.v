@@ -71,7 +71,10 @@ npu_mac u_npu_mac(
    .act_in                   (act_in), 
    .mac_out                  (mac_out), 
    .mac_valid                (mac_valid), 
-   .mac_overflow             (mac_overflow)
+   .mac_overflow             (mac_overflow),
+   .npu_layer_in_progress    (npu_layer_in_progress),
+   .bias_rd_addr	         (bias_rd_addr), 
+   .bias_rd_data	         (bias_rd_data)
 );
 
 npu_maxpool_relu u_npu_maxpool_relu(
@@ -85,8 +88,8 @@ npu_maxpool_relu u_npu_maxpool_relu(
    .hw_mem_wr_data	     (hw_mem_wr_data), 
    .hw_mem_wr_ack_p	     (hw_mem_wr_ack_p),
    .ch_num		     (ch_num), 
-   .bias_rd_addr	     (bias_rd_addr), 
-   .bias_rd_data	     (bias_rd_data), 
+   .bias_rd_addr	     (), 
+   .bias_rd_data	     (8'd0), 
    .act_overflow             (act_overflow),
    .fc2_layer_output_data    (fc2_layer_output_data),
    .fc2_layer_output_valid_p (fc2_layer_output_valid_p)

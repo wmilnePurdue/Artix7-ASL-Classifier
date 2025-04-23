@@ -107,7 +107,7 @@ begin
        layer_act_mem_start_addr_offset_r              <= layer_act_mem_start_addr_offset_c;
        prod_num_of_output_pixel_per_ch_r_times_ch_num <= num_of_output_pixel_per_ch_c * ch_num;
        start_addr_offset_per_ch_r                     <= prod_num_of_output_pixel_per_ch_r_times_ch_num + layer_act_mem_start_addr_offset_r;
-       fc2_layer_output_valid_p                       <= (npu_layer_in_progress == `FC2_LAYER_ENC) & mac_valid_r1;
+       fc2_layer_output_valid_p                       <= (npu_layer_in_progress == `SOFTMAX_LAYER_ENC) & mac_valid_r1;
 
        // Increment Bias read address when layer changes from Conv1 onwards
        if (npu_layer_in_progress == 3'd0) begin
@@ -121,11 +121,11 @@ begin
 	   if (mac_out[DATA_WIDTH-1] & bias_rd_data[DATA_WIDTH-1] & ~mac_plus_bias_c[DATA_WIDTH-1]) begin
        		mac_plus_bias_r[DATA_WIDTH-1]   <= 1'b1;
 		    mac_plus_bias_r[DATA_WIDTH-2:0] <= {(DATA_WIDTH-1){1'b0}};	
-			act_overflow                      <= 1'b1;
+			act_overflow                      <= mac_valid;
 	   end else if (~mac_out[DATA_WIDTH-1] & ~bias_rd_data[DATA_WIDTH-1] & mac_plus_bias_c[DATA_WIDTH-1]) begin
        		mac_plus_bias_r[DATA_WIDTH-1]   <= 1'b0;
 		    mac_plus_bias_r[DATA_WIDTH-2:0] <= {(DATA_WIDTH-1){1'b1}};	
-			act_overflow                      <= 1'b1;
+			act_overflow                      <= mac_valid;
 	   end else begin
 			mac_plus_bias_r                 <= mac_plus_bias_c;
 			act_overflow                      <= 1'b0;

@@ -132,15 +132,16 @@ always_ff @ (posedge clk, negedge resetn) begin
         csr_state <= csr_state_nxt;
         if(csr_state == IDLE) begin
             write_row <= 1'b0;
+            rd_only_o       <= rd_only_csr[ahb_s0_haddr_i[4:2]];
+            mem_prev_sel    <= ahb_s0_haddr_i[13:12];
+            mem_prev_o      <= ahb_s0_haddr_i[11:0];
             if(ahb_s0_htrans_i == HTRANS_NSEQ && ahb_s0_hwrite_i) begin
                 case(ahb_s0_haddr_i[13:12])
                     2'b00: rw_reg_wr <= 1'b1;
                     2'b10: mem0_wr_o <= 1'b1;
                     2'b11: mem1_wr_o <= 1'b1;
                 endcase
-                rd_only_o       <= rd_only_csr[ahb_s0_haddr_i[4:2]];
-                mem_prev_sel    <= ahb_s0_haddr_i[13:12];
-                mem_prev_o      <= ahb_s0_haddr_i[11:0];
+
                 ahb_s0_hready_o <= 1'b0;
             end
         end

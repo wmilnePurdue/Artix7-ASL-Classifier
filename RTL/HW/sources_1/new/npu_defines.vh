@@ -51,6 +51,7 @@
 `define FC1_1_LAYER_ENC           3'd4
 `define FC1_2_LAYER_ENC           3'd5
 `define FC2_LAYER_ENC             3'd6
+`define SOFTMAX_LAYER_ENC         3'd7
 
 `define CONV1_NUM_PIXEL_OUT_PER_CH   9'd256
 `define CONV2_NUM_PIXEL_OUT_PER_CH   9'd64
