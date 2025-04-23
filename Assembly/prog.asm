@@ -33,7 +33,7 @@ bound NPU_RED_LO  0x2000
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; RGB_DIVISOR
-bound RGB_DIVISOR 27
+bound RGB_DIVISOR 218
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I2C initialization values
@@ -418,22 +418,28 @@ call r15,WRITE_I2C_WITH_REGISTER
 ;; r7 - address limit of pixel binner (GREEN)
 ;; r8 - constant 33 (to check if row are at limit)
 ;; r9 - shift value
+;; r10 - const 1 / 32
+;; r11 - npu write row
 
 MAIN_ROUTINE_START:
 ;; POLL if GPIO has triggered
 lss r0,z,0x4008
 lsl r1,z,0x00FF
 lsl r2,z,0
+POLL_GPIO_IF_HIGH:
 lodsw r0,r3,+0
 and r3,r3,r1
-je r3,r2,MAIN_ROUTINE_START
-lss r0,z,0x4000
-lsl r1,z,1
-stosw r1,r0,+4
-stosw r2,r0,+4
+je r3,r2,POLL_GPIO_IF_HIGH
+POLL_GPIO_IF_LOW:
+lodsw r0,r3,+0
+and r3,r3,r1
+jne r3,r2,POLL_GPIO_IF_LOW
+;; lss r0,z,0x4000
+;; lsl r1,z,1
+;; stosw r1,r0,+4
+;; stosw r2,r0,+4
 
 ;; START Camera/NPU processing
-
 lsl r0,nz,$START_PXL_LO
 lss r0,nz,$START_PXL_HI
 lsl r1,z,0
@@ -475,17 +481,37 @@ lsl r7,nz,$PXL_GREEN_LIMIT
 add r3,r3,992
 call r15,STORE_RESULT
 
+;; Write NPU row
+lsl r10,z,32
+lss r11,z,0x8000
+stosw r10,r11,+4
+lsl r10,z,1
+stosw r10,r11,+0
+
 sub r3,r3,2048
 add r1,r1,1
 jne r8,r1,START_ROW_DETECT
 
-;; trigger npu
-;; write SSD
+;; WAIT FOR NPU_DONE
+lss r0,nz,0x8000
+lsl r0,nz,0x1000
+lsl r1,z,1
+POLL_NPU_DONE:
+lodsw r0,r2,+0
+jne r1,r2,POLL_NPU_DONE
+
+;; Read NPU result
+lodsw r0,r1,+4
+;; Write to SSD
+lss r0,z,0xC000
+stosw r0,r1,+0
+lsl r1,z,1
+stosw r0,r1,+4
 
 ;; Poll the push button
 jmp MAIN_ROUTINE_START
-LOOP_HERE:
-jmp LOOP_HERE
+;; LOOP_HERE:
+;; jmp LOOP_HERE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

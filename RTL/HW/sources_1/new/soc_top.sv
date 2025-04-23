@@ -309,10 +309,12 @@ ssd_io SSD_INTERFACE (
     wire pll_lock;
     logic pll_lock1, pll_lock2;
 
+    assign clk_int = cam_clk;
+
     pll_ip_core PLL_INST (
        .clk_in1  (clk        ),
        .resetn   (pll_reset  ),
-       .clk_out1 (clk_int    ),
+       // .clk_out1 (           ),
        .clk_out2 (cam_clk    ),
        .locked   (pll_lock   )
     );
