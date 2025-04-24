@@ -36,7 +36,7 @@ wire [7:0] data_stage_0 [5:0];
 wire [4:0] idx_stage_0  [5:0];
 
 wire [7:0] data_stage_1 [1:0];
-wire [7:0] idx_stage_1  [1:0];
+wire [4:0] idx_stage_1  [1:0];
 
 logic [1:0] valid_temp;
 logic [7:0] data_in_arr [23:0];

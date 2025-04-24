@@ -54,7 +54,7 @@ wire        softmax_result_valid_p;
 wire [4:0]  softmax_class_predicted;
 wire [31:0] mac_enable;
 wire [10:0] filter_mem_rd_addr;
-wire [12:0] activation_mem_rd_addr;
+wire [11:0] activation_mem_rd_addr;
 wire [31:0] mac_overflow;
 wire [31:0] act_overflow;
 wire [11:0] cpu_rgb_mem_addr_o;

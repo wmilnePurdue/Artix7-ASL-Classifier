@@ -63,7 +63,7 @@ always @ (posedge clk, negedge rst)
 begin
     if (~rst) begin
         mult_r        <= {2*DATA_WIDTH{1'b0}}; 
-        partial_sum_r <= {(2*DATA_WIDTH+1){1'b0}};
+        partial_sum_r <= {2*DATA_WIDTH{1'b0}};
         start_r1      <= 1'b0;
         last_r1       <= 1'b0;
         last_r2       <= 1'b0;
@@ -92,8 +92,8 @@ begin
             partial_sum_r[2*DATA_WIDTH-2:0] <= {2*DATA_WIDTH-1{1'b1}};
             mac_overflow                    <= 1'b1;
 	    end else begin
-	        partial_sum_r 				    <= partial_sum_c;
-	        mac_overflow                    <= 1'b0;
+	        partial_sum_r 		<= partial_sum_c;
+	        mac_overflow            <= 1'b0;
 	    end 
 	    
 	   npu_layer_in_progress_r1 <= npu_layer_in_progress;

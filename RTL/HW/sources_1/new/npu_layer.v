@@ -46,7 +46,7 @@ output reg [(32*`LOG2_ACT_ADDR_WIDTH)-1:0] hw_mem_wr_addr;
 output reg [32*8-1:0] hw_mem_wr_data; 
 input  [31:0] hw_mem_wr_ack_p; 
 
-output reg [32*3-1:0] bias_rd_addr;
+output [2:0] bias_rd_addr;
 input  [32*8-1:0] bias_rd_data;
 output [31:0] act_overflow;
 
@@ -72,11 +72,12 @@ reg [4:0] ch_num_arr [31:0];
 
 wire [31:0] fc2_layer_output_valid_p_int;
 wire fc2_layer_output_valid_p = |(fc2_layer_output_valid_p_int);
+wire [2:0] bias_rd_addr = bias_rd_addr_arr[0]; // same bias read address is driven by all MACs
 
 always @ (*)
 begin
     for (j=0; j<32; j=j+1) begin
-        bias_rd_addr[3*j +: 3] = bias_rd_addr_arr[j];
+//        bias_rd_addr[3*j +: 3] = bias_rd_addr_arr[j];
         hw_mem_wr_addr[(`LOG2_ACT_ADDR_WIDTH*j) +: `LOG2_ACT_ADDR_WIDTH] = hw_mem_wr_addr_arr[j];
         hw_mem_wr_data[8*j +: 8] = hw_mem_wr_data_arr[j];
 
