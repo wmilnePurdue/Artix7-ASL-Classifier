@@ -24,8 +24,8 @@ module npu_mac(
     bias_rd_addr, npu_layer_in_progress, bias_rd_data 
     );
 
-parameter DATA_WIDTH = 8;
-parameter NUM_FRAC_BITS = 5;
+parameter DATA_WIDTH = 16;
+parameter NUM_FRAC_BITS = 10;
 
 input clk;
 input rst; 
@@ -73,7 +73,7 @@ begin
      	bias_rd_addr     <= 3'd0;
      	mac_out       <= {DATA_WIDTH{1'b0}}; 
     end else begin
-        mac_out       <= final_sum_c[DATA_WIDTH-1];
+        mac_out       <= final_sum_c[DATA_WIDTH-1:0];
         // delayed control signals for pipeline
         start_r1      <= start_p & mac_en;
         last_r1       <= last_p & mac_en;

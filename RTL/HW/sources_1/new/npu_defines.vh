@@ -59,3 +59,6 @@
 `define FC1_1_NUM_PIXEL_OUT_PER_CH   9'd1
 `define FC1_2_NUM_PIXEL_OUT_PER_CH   9'd1
 `define FC2_NUM_PIXEL_OUT_PER_CH     9'd1
+
+`define NPU_ACT_DATA_WIDTH           16
+`define NPU_NUM_FRAC_BITS            10

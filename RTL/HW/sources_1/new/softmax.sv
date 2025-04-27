@@ -20,32 +20,34 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module softmax(
+module softmax #  (
+    parameter DATA_WIDTH = 16
+)(
     input        clk,
     input        resetn,
 			    
-    input [24*8-1:0]  data_in,
+    input [24*DATA_WIDTH-1:0]  data_in,
     input        valid_i,
 
-    output [7:0] data_out,
+    output [DATA_WIDTH-1:0] data_out,
     output [4:0] idx_out,
     output logic valid_o    
 );
 
-wire [7:0] data_stage_0 [5:0];
+wire [DATA_WIDTH-1:0] data_stage_0 [5:0];
 wire [4:0] idx_stage_0  [5:0];
 
-wire [7:0] data_stage_1 [1:0];
+wire [DATA_WIDTH-1:0] data_stage_1 [1:0];
 wire [4:0] idx_stage_1  [1:0];
 
 logic [1:0] valid_temp;
-logic [7:0] data_in_arr [23:0];
+logic [DATA_WIDTH-1:0] data_in_arr [23:0];
 
 integer j;
 always @ (*)
 begin
     for (j=0; j<24; j=j+1) begin
-        data_in_arr[j]  = data_in[8*j +: 8];
+        data_in_arr[j]  = data_in[DATA_WIDTH*j +: DATA_WIDTH];
     end
 end
 
@@ -79,35 +81,36 @@ for(genvar i0 = 0; i0 < 23; i0 = i0 + 4) begin : STAGE_1
     wire [4:0] index_2 = IDX_2;
     wire [4:0] index_3 = IDX_3;
 
-    wire [7:0] data_0;
-    wire [7:0] data_1;
-    wire [7:0] data_2;
-    wire [7:0] data_3;
+    wire [DATA_WIDTH-1:0] data_0;
+    wire [DATA_WIDTH-1:0] data_1;
+    wire [DATA_WIDTH-1:0] data_2;
+    wire [DATA_WIDTH-1:0] data_3;
 
     assign data_0 = data_in_arr[IDX_0];
     if(IDX_1_CHK) begin
         assign data_1 = data_in_arr[IDX_1];
     end
     else begin
-        assign data_1 = 8'hFF;
+        assign data_1 = {DATA_WIDTH{1'b1}};
     end
 
     if(IDX_2_CHK) begin
         assign data_2 = data_in_arr[IDX_2];
     end
     else begin
-        assign data_2 = 8'hFF;
+        assign data_2 = {DATA_WIDTH{1'b1}};
     end
 
     if(IDX_3_CHK) begin
         assign data_3 = data_in_arr[IDX_3];
     end
     else begin
-        assign data_3 = 8'hFF;
+        assign data_3 = {DATA_WIDTH{1'b1}};
     end
 
     softmax_core # (
-        .NUM_INPUT (NUM_INPUT)
+        .NUM_INPUT (NUM_INPUT),
+        .DATA_WIDTH(DATA_WIDTH)
     ) CORE_N (
         .clk     (clk                    ),
         .resetn  (resetn                 ),
@@ -130,6 +133,7 @@ for(genvar i0 = 0; i0 < 23; i0 = i0 + 4) begin : STAGE_1
 end
 
 softmax_core # (
+   .DATA_WIDTH(DATA_WIDTH),
    .NUM_INPUT (4)
 ) STAGE_2_CORE_0 (
     .clk     (clk              ),
@@ -152,6 +156,7 @@ softmax_core # (
 );
 
 softmax_core # (
+   .DATA_WIDTH(DATA_WIDTH),
    .NUM_INPUT (2)
 ) STAGE_2_CORE_1 (
     .clk     (clk              ),
@@ -164,16 +169,17 @@ softmax_core # (
 	.data_1  (data_stage_0 [5] ),
 					                 
 	.index_2 (5'h0             ),
-	.data_2  (8'hFF            ),
+	.data_2  ({DATA_WIDTH{1'b1}}),
 					                 
 	.index_3 (5'h0             ),
-	.data_3  (8'hFF            ),
+	.data_3  ({DATA_WIDTH{1'b1}}      ),
 
     .index_o (idx_stage_1  [1] ),
     .data_o  (data_stage_1 [1] )
 );
 
 softmax_core # (
+   .DATA_WIDTH(DATA_WIDTH),
     .NUM_INPUT (2)
 ) FINAL_STAGE (
     .clk     (clk              ),
@@ -186,10 +192,10 @@ softmax_core # (
 	.data_1  (data_stage_1 [1] ),
 					                 
 	.index_2 (5'h0             ),
-	.data_2  (8'hFF            ),
+	.data_2  ({DATA_WIDTH{1'b1}}       ),
 					                             
 	.index_3 (5'h0             ),
-	.data_3  (8'hFF            ),
+	.data_3  ({DATA_WIDTH{1'b1}}       ),
 					           
     .index_o (idx_out          ),
     .data_o  (data_out         )

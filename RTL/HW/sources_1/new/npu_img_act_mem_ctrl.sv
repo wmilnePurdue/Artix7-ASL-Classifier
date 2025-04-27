@@ -28,29 +28,29 @@ module npu_img_act_mem_ctrl(
     input wire             hw_act_mem_rd,
     input wire      	   hw_act_mem_rd_bypass,
     input wire [7:0]       npu_rgb_rddata,
-    input wire [7:0]       npu_act_mem_rd_data,
-    output reg [7:0]       npu_muxed_rgb_act_mem_rd_data,
+    input wire [`NPU_ACT_DATA_WIDTH-1:0]       npu_act_mem_rd_data,
+    output reg [`NPU_ACT_DATA_WIDTH-1:0]       npu_muxed_rgb_act_mem_rd_data,
 
     output reg             npu_act_mem_wr_en,
     output reg [`LOG2_ACT_ADDR_WIDTH-1:0] npu_act_mem_wr_addr,
-    output reg [7:0]       npu_act_mem_wr_data,
+    output reg [`NPU_ACT_DATA_WIDTH-1:0]       npu_act_mem_wr_data,
 
     input  wire [31:0]     hw_mem_wr, // latched till ack_p is set
     input  wire [32*`LOG2_ACT_ADDR_WIDTH-1:0] hw_mem_wr_addr, 
-    input  wire [32*8-1:0] hw_mem_wr_data, 
+    input  wire [32*`NPU_ACT_DATA_WIDTH-1:0] hw_mem_wr_data, 
     output wire [31:0]     hw_mem_wr_ack_p 
 
 );
 
 integer j;
-reg [7:0] hw_mem_wr_data_arr [31:0];
+reg [`NPU_ACT_DATA_WIDTH-1:0] hw_mem_wr_data_arr [31:0];
 reg [`LOG2_ACT_ADDR_WIDTH-1:0] hw_mem_wr_addr_arr [31:0];
 
 always @ (*)
 begin
     for (j=0; j<32; j=j+1) begin
         hw_mem_wr_addr_arr[j] = hw_mem_wr_addr[(`LOG2_ACT_ADDR_WIDTH*j) +: `LOG2_ACT_ADDR_WIDTH];
-        hw_mem_wr_data_arr[j] = hw_mem_wr_data[8*j +: 8];
+        hw_mem_wr_data_arr[j] = hw_mem_wr_data[`NPU_ACT_DATA_WIDTH*j +: `NPU_ACT_DATA_WIDTH];
     end
 end
 
@@ -109,18 +109,18 @@ begin
         wr_service_cnt_r        <= 5'd0;	    
         npu_act_mem_wr_en       <= 1'b0;
         npu_act_mem_wr_addr     <= {`LOG2_ACT_ADDR_WIDTH{1'b0}};
-        npu_act_mem_wr_data     <= 8'd0;
+        npu_act_mem_wr_data     <= {`NPU_ACT_DATA_WIDTH{1'b0}};
 	hw_rgb_mem_rd_r1        <= 1'b0;
 	hw_act_mem_rd_r1        <= 1'b0;
         hw_act_mem_rd_bypass_r1 <= 1'b0;
-	npu_muxed_rgb_act_mem_rd_data <= 8'd0;
+	npu_muxed_rgb_act_mem_rd_data <= {`NPU_ACT_DATA_WIDTH{1'b0}};
     end else begin
 	hw_rgb_mem_rd_r1        <= hw_rgb_mem_rd;
 	hw_act_mem_rd_r1        <= hw_act_mem_rd;
         hw_act_mem_rd_bypass_r1 <= hw_act_mem_rd_bypass;
 	// Bypass is set for Pad in Conv layer
-	npu_muxed_rgb_act_mem_rd_data <= (hw_act_mem_rd_bypass_r1) ? 8'd0 : 
-				         (hw_rgb_mem_rd_r1) ? npu_rgb_rddata : npu_act_mem_rd_data;
+	npu_muxed_rgb_act_mem_rd_data <= (hw_act_mem_rd_bypass_r1) ? {`NPU_ACT_DATA_WIDTH{1'b0}} : 
+				         (hw_rgb_mem_rd_r1) ? {3'd0,npu_rgb_rddata,5'd0} : npu_act_mem_rd_data;
 	
 	if (atleast_one_wr_set_c) begin
 	    wr_service_cnt_r <= wr_service_cnt_r + 5'd1;
@@ -261,7 +261,7 @@ begin
                 end
             default: begin
                 npu_act_mem_wr_addr    <= {`LOG2_ACT_ADDR_WIDTH{1'b0}};
-                npu_act_mem_wr_data <= 8'd0;
+                npu_act_mem_wr_data <= {`NPU_ACT_DATA_WIDTH{1'b0}};
                 end
 	    endcase
         end
