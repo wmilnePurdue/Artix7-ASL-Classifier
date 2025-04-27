@@ -23,8 +23,7 @@
 
 module soc_top(
     input                   clk,
-    input                   reset,
-	output wire             pll_locked,
+    input                   resetn,
 
     // External-interface
     input  [`IN_IO-1:0]     ext_input_io,
@@ -112,9 +111,8 @@ wire [31:0]     ahb_out_unit_hwdata_o;
 wire            ahb_out_unit_hready_i;
 wire            ahb_out_unit_hresp_i;
 wire [31:0]     ahb_out_unit_hrdata_i;
-wire            resetn = ~reset;
 
-assign pll_locked = pll_en;
+wire [5:0]      row_info;
 
 cpu_core # (
     .AWID                (12                          )
@@ -228,7 +226,9 @@ ov7670_gpio # (
     .p_data              (p_data                      ),
 								                      
     .i2c_scl             (i2c_scl                     ),
-    .i2c_sda             (i2c_sda                     )
+    .i2c_sda             (i2c_sda                     ),
+
+    .row_reg_o           (row_info                    )
 );
 
 `ifdef NPU_ACCELERATOR
@@ -293,12 +293,13 @@ ssd_io SSD_INTERFACE (
     .ahb_s0_htrans_i     (ahb_out_unit_htrans_o    ),
     .ahb_s0_hmastlock_i  (ahb_out_unit_hmastlock_o ),
     .ahb_s0_hwdata_i     (ahb_out_unit_hwdata_o    ),
-    .SW0(SW0),
+    .SW0                 (SW0                      ),
     .ahb_s0_hready_o     (ahb_out_unit_hready_i    ),
     .ahb_s0_hresp_o      (ahb_out_unit_hresp_i     ),
     .ahb_s0_hrdata_o     (ahb_out_unit_hrdata_i    ),
-    .seg(seg),
-    .an(an)
+    .seg                 (seg                      ),
+    .an                  (an                       ),
+    .row_i               (row_info                 )
 );
 `else
     assign ahb_out_unit_hready_i = 1'b1;
