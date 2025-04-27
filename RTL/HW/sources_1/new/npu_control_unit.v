@@ -27,10 +27,12 @@ module npu_control_unit(
     softmax_result_valid_p, softmax_class_predicted,
     npu_active, npu_done, npu_layer_in_progress, img_num_rows_written, npu_class_predicted,
     mac_enable, mac_start_p, mac_last_p,
-    filter_mem_rd_en, filter_mem_rd_addr,
+    filter_mem_rd_en, filter_mem_rd_addr, rgb_mem_rd_en,
     activation_mem_rd_en, activation_mem_rd_addr, activation_mem_rd_bypass,
     cur_state_conv1_c, cur_state_conv2_c, cur_state_conv3_c,
-    cur_state_fc1_1_c, cur_state_fc1_2_c, cur_state_fc2_c       
+    cur_state_fc1_1_c, cur_state_fc1_2_c, cur_state_fc2_c,
+    mac_overflow, act_overflow, mac_overflow_lat_r,
+    act_overflow_lat_r
 );
 // Clock, reset
 input npu_clk;
@@ -68,9 +70,16 @@ output reg [31:0] filter_mem_rd_en; // active high per 32 banks read enable
 output reg [`LOG2_FILTER_MEM_ADDR_WIDTH-1:0] filter_mem_rd_addr; // byte aligned address; read address common to all 32 banks
 
 // Activation Mem read
+output reg rgb_mem_rd_en;
 output reg activation_mem_rd_en;
 output reg [`LOG2_ACT_ADDR_WIDTH-1:0] activation_mem_rd_addr; // byte aligned address 
 output reg activation_mem_rd_bypass; // when this is high, generate 0 as read data out instead of memory output with same latency
+
+// Status
+input [31:0] mac_overflow;
+input [31:0] act_overflow;
+output reg mac_overflow_lat_r;
+output reg act_overflow_lat_r;
 
 // State one-hot defines
 localparam NPU_STATE_IDLE                 = 14'b00_0000_0000_0001;
@@ -138,14 +147,16 @@ reg [`LOG2_ACT_ADDR_WIDTH-1:0] conv_act_mem_rd_addr_r2;
 reg [`LOG2_ACT_ADDR_WIDTH-1:0] fc1_act_mem_rd_addr_r1;
 reg [`LOG2_ACT_ADDR_WIDTH-1:0] fc1_act_mem_rd_addr_r2;
 
-reg [4:0] result_wr_wait_cnt;
+reg [5:0] result_wr_wait_cnt;
 
 reg [3:0] filter_num_in_ch_cnt_r1;
 reg bypass_act_mem_rd_r2;
+reg npu_done_r1;
 
 wire npu_done = (npu_state_r == NPU_STATE_DONE);
 wire npu_active = (npu_state_r != NPU_STATE_IDLE) & (npu_state_r != NPU_STATE_DONE);
 
+wire cur_state_idle_c  = (npu_state_r == NPU_STATE_IDLE);
 wire cur_state_conv1_c = (npu_state_r == NPU_STATE_CONV1);
 wire cur_state_conv2_c = (npu_state_r == NPU_STATE_CONV2);
 wire cur_state_conv3_c = (npu_state_r == NPU_STATE_CONV3);
@@ -178,7 +189,7 @@ wire conv_termnical_cnt_c = (quad_op_row_cnt == quad_row_col_cnt_max_minus_1) & 
 		            (quad_op_rel_cnt == 2'd3) & output_pixel_comp_boundary_c;			     
 
 // Below counters define boundary of Conv Layer operations
-always @ (posedge npu_clk or negedge npu_rst_n) 
+always @ (posedge npu_clk, negedge npu_rst_n) 
 begin
 if (~npu_rst_n) begin
     filter_row_cnt_r                   <= 2'd0;
@@ -301,7 +312,7 @@ wire [3:0] filter_num_in_ch_cnt_max_minus_1_r1_c = (cur_state_conv1_pipeline_r[0
                                             (cur_state_conv2_pipeline_r[0]) ? `CONV2_NUM_INPUT_CH_MINUS_1 :
                                             `CONV3_NUM_INPUT_CH_MINUS_1 ;    
 
-always @ (posedge npu_clk or negedge npu_rst_n) 
+always @ (posedge npu_clk, negedge npu_rst_n) 
 begin
 if (~npu_rst_n) begin
     op_rel_row_cnt_without_pad   <= 2'd0;
@@ -367,59 +378,65 @@ wire fc1_terminal_cnt_c = (fc1_row_cnt == 2'd3) & (fc1_col_cnt == 2'd3) & (fc1_i
 wire fc2_terminal_cnt_c = (fc2_act_cnt == 6'd63);
 // As per flattening order done by Matlab Flatten layer; Row (or Height first), then Col (or Width) and then input channel
 
-wire result_wr_wait_terminal_cnt_c = (result_wr_wait_cnt == 5'd31);
+wire result_wr_wait_terminal_cnt_c = (result_wr_wait_cnt == 6'd63);
 
-always @ (posedge npu_clk or negedge npu_rst_n) 
-begin
-if (~npu_rst_n) begin
-    fc1_row_cnt    <= 2'd0;
-    fc1_col_cnt    <= 2'd0;
-    fc1_inp_ch_cnt <= 5'd0;
-    fc2_act_cnt    <= 6'd0;   
-    result_wr_wait_cnt <= 5'd0;   
-end else begin
-    if (cur_state_fc1_1_c | cur_state_fc1_2_c) begin
-        if (fc1_row_cnt == 2'd3) begin
-            fc1_row_cnt  <= 2'd0;
-            if (fc1_col_cnt == 2'd3) begin
-                fc1_col_cnt <= 2'd0;
-                if (fc1_inp_ch_cnt == 5'd23) begin
-                    fc1_inp_ch_cnt <= 5'd0;
-                end else begin
-                    fc1_inp_ch_cnt <= fc1_inp_ch_cnt + 5'd1;
-                end
-            end else begin
-                fc1_col_cnt <= fc1_col_cnt + 2'd1;
-            end
-        end else begin
-            fc1_row_cnt  <= fc1_row_cnt + 2'd1;        
-        end
-     end else begin
+always @ (posedge npu_clk, negedge npu_rst_n)  begin
+    if (~npu_rst_n) begin
         fc1_row_cnt    <= 2'd0;
         fc1_col_cnt    <= 2'd0;
-        fc1_inp_ch_cnt <= 5'd0;       
-     end
-   end
-   // FC2 - read activation linearly 
-   if (cur_state_fc2_c) begin
-       if (fc2_act_cnt < 6'd63) begin
-           fc2_act_cnt <= fc2_act_cnt + 6'd1;
-       end
-   end else begin
-       fc2_act_cnt <= 6'd0;
-   end  
-   
-   if (cur_state_wait_conv1_result_wr_c | cur_state_wait_conv2_result_wr_c | cur_state_wait_conv3_result_wr_c |
-       cur_state_wait_fc1_1_result_wr_c | cur_state_wait_fc1_2_result_wr_c) begin
-       result_wr_wait_cnt <= result_wr_wait_cnt + 5'd1;
-   end else begin
-       result_wr_wait_cnt <= 5'd0;
-   end     
-end          
+        fc1_inp_ch_cnt <= 5'd0;
+        fc2_act_cnt    <= 6'd0;   
+        result_wr_wait_cnt <= 6'd0;   
+    end 
+    else begin
+        if (cur_state_fc1_1_c | cur_state_fc1_2_c) begin
+            if (fc1_row_cnt == 2'd3) begin
+                fc1_row_cnt  <= 2'd0;
+                if (fc1_col_cnt == 2'd3) begin
+                    fc1_col_cnt <= 2'd0;
+                    if (fc1_inp_ch_cnt == 5'd23) begin
+                        fc1_inp_ch_cnt <= 5'd0;
+                    end 
+                    else begin
+                        fc1_inp_ch_cnt <= fc1_inp_ch_cnt + 5'd1;
+                    end
+                end 
+                else begin
+                    fc1_col_cnt <= fc1_col_cnt + 2'd1;
+                end
+            end 
+            else begin
+                fc1_row_cnt  <= fc1_row_cnt + 2'd1;        
+            end
+        end 
+        else begin
+            fc1_row_cnt    <= 2'd0;
+            fc1_col_cnt    <= 2'd0;
+            fc1_inp_ch_cnt <= 5'd0;       
+        end
+    
+        // FC2 - read activation linearly 
+        if (cur_state_fc2_c) begin
+            if (fc2_act_cnt < 6'd63) begin
+                fc2_act_cnt <= fc2_act_cnt + 6'd1;
+            end
+        end else begin
+            fc2_act_cnt <= 6'd0;
+        end  
+        
+        if (cur_state_wait_conv1_result_wr_c | cur_state_wait_conv2_result_wr_c | cur_state_wait_conv3_result_wr_c |
+            cur_state_wait_fc1_1_result_wr_c | cur_state_wait_fc1_2_result_wr_c) begin
+            result_wr_wait_cnt <= result_wr_wait_cnt + 6'd1;
+        end else begin
+            result_wr_wait_cnt <= 6'd0;
+        end   
+    end
+end
+  
+        
 
 // pipelining
-always @ (posedge npu_clk or negedge npu_rst_n) 
-begin
+always @ (posedge npu_clk, negedge npu_rst_n) begin
  if (~npu_rst_n) begin
    cur_state_conv1_pipeline_r     <= 4'd0;
    cur_state_conv2_pipeline_r     <= 4'd0;
@@ -448,7 +465,9 @@ begin
    fc2_act_cnt_r1                 <= 6'd0;
    fc2_act_cnt_r2                 <= 6'd0;
    filter_row_cnt_r1              <= 2'd0;
-end else begin
+   npu_done_r1                    <= 2'd0;
+ end 
+ else begin
    cur_state_conv1_pipeline_r     <= {cur_state_conv1_pipeline_r[2:0],cur_state_conv1_c};
    cur_state_conv2_pipeline_r     <= {cur_state_conv2_pipeline_r[2:0],cur_state_conv2_c};
    cur_state_conv3_pipeline_r     <= {cur_state_conv3_pipeline_r[2:0],cur_state_conv3_c};
@@ -476,33 +495,34 @@ end else begin
    bypass_act_mem_rd_r2           <= bypass_act_mem_rd_r1_c;
    fc2_act_cnt_r1                 <= fc2_act_cnt;
    fc2_act_cnt_r2                 <= fc2_act_cnt_r1;
+   npu_done_r1                    <= npu_done;
   end
 end
 
 // Mux filter start, end and channel enable based on state
-wire [`LOG2_FILTER_MEM_ADDR_WIDTH-1:0] filter_rd_start_addr_mux_r3_c =  cur_state_conv1_pipeline_r[2]  ? `CONV1_FILTER_START_ADDR :
-                                       cur_state_conv2_pipeline_r[2]  ? `CONV2_FILTER_START_ADDR :
-                                       cur_state_conv3_pipeline_r[2]  ? `CONV3_FILTER_START_ADDR :
-                                       cur_state_fc1_1_pipeline_r[2]  ? `FC1_1_FILTER_START_ADDR :
-                                       cur_state_fc1_2_pipeline_r[2]  ? `FC1_2_FILTER_START_ADDR :
-                                       cur_state_fc2_pipeline_r[2]    ? `FC2_FILTER_START_ADDR :
+wire [`LOG2_FILTER_MEM_ADDR_WIDTH-1:0] filter_rd_start_addr_mux_r4_c =  cur_state_conv1_pipeline_r[3]  ? `CONV1_FILTER_START_ADDR :
+                                       cur_state_conv2_pipeline_r[3]  ? `CONV2_FILTER_START_ADDR :
+                                       cur_state_conv3_pipeline_r[3]  ? `CONV3_FILTER_START_ADDR :
+                                       cur_state_fc1_1_pipeline_r[3]  ? `FC1_1_FILTER_START_ADDR :
+                                       cur_state_fc1_2_pipeline_r[3]  ? `FC1_2_FILTER_START_ADDR :
+                                       cur_state_fc2_pipeline_r[3]    ? `FC2_FILTER_START_ADDR :
                                        11'd0;
 
 
-wire [`LOG2_FILTER_MEM_ADDR_WIDTH-1:0] filter_rd_end_addr_mux_r3_c =  cur_state_conv1_pipeline_r[2]  ? `CONV1_FILTER_END_ADDR :
-                                       cur_state_conv2_pipeline_r[2]  ? `CONV2_FILTER_END_ADDR :
-                                       cur_state_conv3_pipeline_r[2]  ? `CONV3_FILTER_END_ADDR :
-                                       cur_state_fc1_1_pipeline_r[2]  ? `FC1_1_FILTER_END_ADDR :
-                                       cur_state_fc1_2_pipeline_r[2]  ? `FC1_2_FILTER_END_ADDR :
-                                       cur_state_fc2_pipeline_r[2]    ? `FC2_FILTER_END_ADDR :
+wire [`LOG2_FILTER_MEM_ADDR_WIDTH-1:0] filter_rd_end_addr_mux_r4_c =  cur_state_conv1_pipeline_r[3]  ? `CONV1_FILTER_END_ADDR :
+                                       cur_state_conv2_pipeline_r[3]  ? `CONV2_FILTER_END_ADDR :
+                                       cur_state_conv3_pipeline_r[3]  ? `CONV3_FILTER_END_ADDR :
+                                       cur_state_fc1_1_pipeline_r[3]  ? `FC1_1_FILTER_END_ADDR :
+                                       cur_state_fc1_2_pipeline_r[3]  ? `FC1_2_FILTER_END_ADDR :
+                                       cur_state_fc2_pipeline_r[3]    ? `FC2_FILTER_END_ADDR :
                                        11'd0;
                                        
-wire [31:0] filter_rd_en_mux_r2_c =    cur_state_conv1_pipeline_r[1]  ? `CONV1_FILTER_EN :
-                                       cur_state_conv2_pipeline_r[1]  ? `CONV2_FILTER_EN :
-                                       cur_state_conv3_pipeline_r[1]  ? `CONV3_FILTER_EN :
-                                       cur_state_fc1_1_pipeline_r[1]  ? `FC1_1_FILTER_EN :
-                                       cur_state_fc1_2_pipeline_r[1]  ? `FC1_2_FILTER_EN :
-                                       cur_state_fc2_pipeline_r[1]    ? `FC2_FILTER_EN :
+wire [31:0] filter_rd_en_mux_r3_c =    cur_state_conv1_pipeline_r[2]  ? `CONV1_FILTER_EN :
+                                       cur_state_conv2_pipeline_r[2]  ? `CONV2_FILTER_EN :
+                                       cur_state_conv3_pipeline_r[2]  ? `CONV3_FILTER_EN :
+                                       cur_state_fc1_1_pipeline_r[2]  ? `FC1_1_FILTER_EN :
+                                       cur_state_fc1_2_pipeline_r[2]  ? `FC1_2_FILTER_EN :
+                                       cur_state_fc2_pipeline_r[2]    ? `FC2_FILTER_EN :
                                        32'd0;
                                        
 wire [31:0] filter_rd_en_mux_r4_c =    cur_state_conv1_pipeline_r[3]  ? `CONV1_FILTER_EN :
@@ -521,9 +541,17 @@ wire cur_state_fc_or_conv_r2_c = (cur_state_conv1_pipeline_r[1] | cur_state_conv
                                  cur_state_conv3_pipeline_r[1] | cur_state_fc1_1_pipeline_r[1] |
                                  cur_state_fc1_2_pipeline_r[1] | cur_state_fc2_pipeline_r[1]);
 
+wire cur_state_fc_or_conv_r2_excpt_conv1_c = (cur_state_conv2_pipeline_r[1] |
+                                 cur_state_conv3_pipeline_r[1] | cur_state_fc1_1_pipeline_r[1] |
+                                 cur_state_fc1_2_pipeline_r[1] | cur_state_fc2_pipeline_r[1]);
+
 wire cur_state_fc_or_conv_r3_c = (cur_state_conv1_pipeline_r[2] | cur_state_conv2_pipeline_r[2] |
                                  cur_state_conv3_pipeline_r[2] | cur_state_fc1_1_pipeline_r[2] |
                                  cur_state_fc1_2_pipeline_r[2] | cur_state_fc2_pipeline_r[2]);
+
+wire cur_state_fc_or_conv_r4_c = (cur_state_conv1_pipeline_r[3] | cur_state_conv2_pipeline_r[3] |
+                                 cur_state_conv3_pipeline_r[3] | cur_state_fc1_1_pipeline_r[3] |
+                                 cur_state_fc1_2_pipeline_r[3] | cur_state_fc2_pipeline_r[3]);
                                  
 wire cur_state_conv_r2_c = (cur_state_conv1_pipeline_r[1] | cur_state_conv2_pipeline_r[1] |
                            cur_state_conv3_pipeline_r[1]);                                 
@@ -536,31 +564,36 @@ wire [`LOG2_ACT_ADDR_WIDTH-1:0] activation_mem_rd_addr_rel_mux_r2_c = (cur_state
 								       fc1_act_mem_rd_addr_r2 : fc2_act_cnt_r2;  
                                                                    
 
-always @ (posedge npu_clk or negedge npu_rst_n) 
+always @ (posedge npu_clk, negedge npu_rst_n) 
 begin
   if (~npu_rst_n) begin
       filter_mem_rd_en       <= 32'd0; // active high per 32 banks read enable
       filter_mem_rd_addr     <= {`LOG2_FILTER_MEM_ADDR_WIDTH{1'b0}};
       
-      activation_mem_rd_en      <= 1'b0;
-      activation_mem_rd_addr    <= {`LOG2_ACT_ADDR_WIDTH{1'b0}}; 
+      rgb_mem_rd_en          <= 1'b0;
+      activation_mem_rd_en   <= 1'b0;
+      activation_mem_rd_addr <= {`LOG2_ACT_ADDR_WIDTH{1'b0}}; 
       activation_mem_rd_bypass  <= 1'b0; 
       img_num_rows_written   <=  6'd0;
       npu_class_predicted    <=  5'd0;
       mac_enable             <=  32'd0;
       mac_start_p            <=  1'b0;
-      mac_last_p             <=  1'b0;
+      mac_last_p             <=  1'b0; 
+      mac_overflow_lat_r     <=  1'b0;
+      act_overflow_lat_r     <=  1'b0;
   end else begin
       // Filter read en and addr
-      filter_mem_rd_en       <=  filter_rd_en_mux_r2_c;
+      filter_mem_rd_en       <=  filter_rd_en_mux_r3_c;
       mac_enable             <=  filter_rd_en_mux_r4_c;
       mac_start_p            <=  mac_boundary_start_pipeline_r[3];
       mac_last_p             <=  mac_boundary_end_pipeline_r[3];
-      if (cur_state_fc_or_conv_r3_c & ~cur_state_fc_or_conv_r2_c) begin
+      if (cur_state_idle_c) begin
+          filter_mem_rd_addr <= {`LOG2_FILTER_MEM_ADDR_WIDTH{1'b0}};
+      end else if (cur_state_fc_or_conv_r4_c & ~cur_state_fc_or_conv_r3_c & ~cur_state_fc2_pipeline_r[3]) begin
           filter_mem_rd_addr <= filter_mem_rd_addr + 1;
-      end else if (cur_state_fc_or_conv_r3_c & cur_state_fc_or_conv_r2_c) begin
-          if (filter_mem_rd_addr == filter_rd_end_addr_mux_r3_c) begin
-              filter_mem_rd_addr <= filter_rd_start_addr_mux_r3_c;
+      end else if (cur_state_fc_or_conv_r4_c & cur_state_fc_or_conv_r3_c) begin
+          if (filter_mem_rd_addr == filter_rd_end_addr_mux_r4_c) begin
+              filter_mem_rd_addr <= filter_rd_start_addr_mux_r4_c;
           end else begin
               filter_mem_rd_addr <= filter_mem_rd_addr + 1;
           end
@@ -568,20 +601,26 @@ begin
       
       // Act mem read en, read bypass and read address 
       activation_mem_rd_bypass  <= bypass_act_mem_rd_r2 & cur_state_conv_r2_c;
-      activation_mem_rd_en      <= cur_state_fc_or_conv_r2_c;
+      rgb_mem_rd_en             <= cur_state_conv1_pipeline_r[1];
+      activation_mem_rd_en      <= cur_state_fc_or_conv_r2_excpt_conv1_c;
       activation_mem_rd_addr    <= activation_mem_rd_addr_rel_mux_r2_c + activation_mem_start_offset_r2_c;     
 
       // cfg_write_row_p indicates CPU has written 1ROW for all 3 channels
       // i.e. 32x3 pixels. Increment counter when this pulse is rcvd
       // reset counter when NPU is done
-      if (npu_done) begin
+      if (npu_done & ~npu_done_r1) begin
           img_num_rows_written   <=  6'd0;
       end else if (cfg_write_row_p) begin
-	  img_num_rows_written   <= img_num_rows_written + 6'd1;
+	      img_num_rows_written   <= img_num_rows_written + 6'd1;
       end
 
       // Latch NPU classification result
       npu_class_predicted    <=  (softmax_result_valid_p) ? softmax_class_predicted : npu_class_predicted;
+
+      // Set sticky status overflow when overflow happens; when NPU is in IDLE
+      // state
+      mac_overflow_lat_r <= (cur_state_idle_c) ? 1'b0 : (|mac_overflow) ? 1'b1 : mac_overflow_lat_r;
+      act_overflow_lat_r <= (cur_state_idle_c) ? 1'b0 : (|act_overflow) ? 1'b1 : act_overflow_lat_r;
   end
 end 
 
@@ -639,22 +678,22 @@ begin
     NPU_STATE_FC1_2:
     begin
         nxt_npu_state_r = (fc1_terminal_cnt_c) ? NPU_STATE_WAIT_FC1_2_RESULT_WR : NPU_STATE_FC1_2;
-	npu_layer_in_progress = 3'd4;
+	npu_layer_in_progress = 3'd5;
     end
     NPU_STATE_WAIT_FC1_2_RESULT_WR:
     begin
         nxt_npu_state_r = (result_wr_wait_terminal_cnt_c) ? NPU_STATE_FC2 : NPU_STATE_WAIT_FC1_2_RESULT_WR;
-	    npu_layer_in_progress = 3'd4;
+	    npu_layer_in_progress = 3'd5;
     end
     NPU_STATE_FC2:
     begin
         nxt_npu_state_r = (fc2_terminal_cnt_c) ? NPU_STATE_SOFTMAX : NPU_STATE_FC2;
-	    npu_layer_in_progress = 3'd5;
+	    npu_layer_in_progress = 3'd6;
     end
     NPU_STATE_SOFTMAX:
     begin
         nxt_npu_state_r = (softmax_result_valid_p) ? NPU_STATE_DONE : NPU_STATE_SOFTMAX;
-	    npu_layer_in_progress = 3'd6;
+	    npu_layer_in_progress = 3'd7;
     end
     NPU_STATE_DONE:
     begin

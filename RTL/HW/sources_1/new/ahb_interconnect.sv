@@ -195,6 +195,8 @@ always_ff @(posedge clk, negedge resetn) begin
             end
             ISSUE: begin
                 ahb_m0_htrans_o <= HTRANS_IDLE;
+                ahb_m1_htrans_o <= HTRANS_IDLE;
+                ahb_m2_htrans_o <= HTRANS_IDLE;
                 case(ahb_addr_p_r)
                     2'b01: begin
                         ahb_m0_hwdata_o <= ahb_s0_hwdata_i;

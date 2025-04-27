@@ -24,7 +24,7 @@ module softmax(
     input        clk,
     input        resetn,
 			    
-    input [7:0]  data_in [28:0],
+    input [24*8-1:0]  data_in,
     input        valid_i,
 
     output [7:0] data_out,
@@ -32,13 +32,22 @@ module softmax(
     output logic valid_o    
 );
 
-wire [7:0] data_stage_0 [7:0];
-wire [4:0] idx_stage_0  [7:0];
+wire [7:0] data_stage_0 [5:0];
+wire [4:0] idx_stage_0  [5:0];
 
 wire [7:0] data_stage_1 [1:0];
-wire [7:0] idx_stage_1  [1:0];
+wire [4:0] idx_stage_1  [1:0];
 
 logic [1:0] valid_temp;
+logic [7:0] data_in_arr [23:0];
+
+integer j;
+always @ (*)
+begin
+    for (j=0; j<24; j=j+1) begin
+        data_in_arr[j]  = data_in[8*j +: 8];
+    end
+end
 
 always_ff @ (posedge clk, negedge resetn) begin
     if(~resetn) begin 
@@ -52,7 +61,7 @@ always_ff @ (posedge clk, negedge resetn) begin
     end
 end
 
-for(genvar i0 = 0; i0 < 29; i0 = i0 + 4) begin : STAGE_1
+for(genvar i0 = 0; i0 < 23; i0 = i0 + 4) begin : STAGE_1
     localparam IDX_0     = i0;
     localparam IDX_1     = i0 + 1;
     localparam IDX_2     = i0 + 2;
@@ -75,23 +84,23 @@ for(genvar i0 = 0; i0 < 29; i0 = i0 + 4) begin : STAGE_1
     wire [7:0] data_2;
     wire [7:0] data_3;
 
-    assign data_0 = data_in[IDX_0];
+    assign data_0 = data_in_arr[IDX_0];
     if(IDX_1_CHK) begin
-        assign data_1 = data_in[IDX_1];
+        assign data_1 = data_in_arr[IDX_1];
     end
     else begin
         assign data_1 = 8'hFF;
     end
 
     if(IDX_2_CHK) begin
-        assign data_2 = data_in[IDX_2];
+        assign data_2 = data_in_arr[IDX_2];
     end
     else begin
         assign data_2 = 8'hFF;
     end
 
     if(IDX_3_CHK) begin
-        assign data_3 = data_in[IDX_3];
+        assign data_3 = data_in_arr[IDX_3];
     end
     else begin
         assign data_3 = 8'hFF;
@@ -143,7 +152,7 @@ softmax_core # (
 );
 
 softmax_core # (
-   .NUM_INPUT (4)
+   .NUM_INPUT (2)
 ) STAGE_2_CORE_1 (
     .clk     (clk              ),
     .resetn  (resetn           ),
@@ -154,11 +163,11 @@ softmax_core # (
 	.index_1 (idx_stage_0  [5] ),
 	.data_1  (data_stage_0 [5] ),
 					                 
-	.index_2 (idx_stage_0  [6] ),
-	.data_2  (data_stage_0 [6] ),
+	.index_2 (5'h0             ),
+	.data_2  (8'hFF            ),
 					                 
-	.index_3 (idx_stage_0  [7] ),
-	.data_3  (data_stage_0 [7] ),
+	.index_3 (5'h0             ),
+	.data_3  (8'hFF            ),
 
     .index_o (idx_stage_1  [1] ),
     .data_o  (data_stage_1 [1] )

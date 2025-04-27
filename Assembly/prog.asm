@@ -33,14 +33,14 @@ bound NPU_RED_LO  0x2000
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; RGB_DIVISOR
-bound RGB_DIVISOR 27
+bound RGB_DIVISOR 218
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; I2C initialization values
 ;; Target Clock = 400kHz
 ;; Input Clock = 116MHz
-;; I2C delay line = (116 MHz / 400 kHz) = 290 -> 
-bound I2C_DELAY_LINE    0x122
+;; I2C delay line = (100 MHz / 400 kHz) = 250 -> 
+bound I2C_DELAY_LINE    250
 bound I2C_RESET_DELAY   0x1000
 
 ;; I2C Registers to write
@@ -191,7 +191,11 @@ lsl r15,z,0xFFFF
 ;; ** Initialize I2C
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-lss r0,z, $I2C_WR_ADDR_HI
+lss r0,z,0x4000
+lsl r1,z,1
+stosw r1,r0,+0
+
+lss r0,z,$I2C_WR_ADDR_HI
 lsl r1,z,$I2C_DELAY_LINE
 stosw r1,r0,+16
 
@@ -418,26 +422,50 @@ call r15,WRITE_I2C_WITH_REGISTER
 ;; r7 - address limit of pixel binner (GREEN)
 ;; r8 - constant 33 (to check if row are at limit)
 ;; r9 - shift value
+;; r10 - const 1 / 32
+;; r11 - npu write row
+;; r12 - LED output Address
+;; r13 - LED write data
 
 MAIN_ROUTINE_START:
+
+;; Enable LED (as polling button)
+lss r12,z,0x4000
+lsl r13,z,0x5
+stosw r13,r12,+0
+
 ;; POLL if GPIO has triggered
+
 lss r0,z,0x4008
 lsl r1,z,0x00FF
 lsl r2,z,0
+POLL_GPIO_IF_HIGH:
 lodsw r0,r3,+0
 and r3,r3,r1
-je r3,r2,MAIN_ROUTINE_START
-lss r0,z,0x4000
-lsl r1,z,1
-stosw r1,r0,+4
-stosw r2,r0,+4
+je r3,r2,POLL_GPIO_IF_HIGH
+POLL_GPIO_IF_LOW:
+lodsw r0,r3,+0
+and r3,r3,r1
+jne r3,r2,POLL_GPIO_IF_LOW
+;; lss r0,z,0x4000
+;; lsl r1,z,1
+;; stosw r1,r0,+4
+;; stosw r2,r0,+4
+
+;; Enable LED (as waiting data)
+lss r12,z,0x4000
+lsl r13,z,0x9
+stosw r13,r12,+0
 
 ;; START Camera/NPU processing
-
 lsl r0,nz,$START_PXL_LO
 lss r0,nz,$START_PXL_HI
 lsl r1,z,0
 stosw r1,r0,+0
+lsl r1,z,1
+;; add nop instruction for synchronization
+mul r1,r1,r1,l
+;; end nop
 lsl r1,z,1
 stosw r1,r0,+0
 
@@ -446,7 +474,7 @@ lsl r3,nz,$NPU_RED_LO
 lsl r4,z,$RGB_DIVISOR
 lss r5,z,$MASK_DATA
 lss r7,nz,0x4008
-lss r8,z,33
+lsl r8,z,33
 
 START_ROW_DETECT:
 lss r0,z,$ROW_READ_HI
@@ -463,6 +491,12 @@ POLL_ROW:
 lodsw r0,r2,+392
 jne r2,r1,POLL_ROW
 
+;; Enable LED (received at least 1 data)
+lss r12,z,0x4000
+lsl r13,z,0x11
+stosw r13,r12,+0
+
+;; Write Data to NPU
 lsl r0,nz,$PXL_RED_START_LO
 lsl r7,nz,$PXL_RED_LIMIT
 call r15,STORE_RESULT
@@ -475,17 +509,42 @@ lsl r7,nz,$PXL_GREEN_LIMIT
 add r3,r3,992
 call r15,STORE_RESULT
 
+;; Write NPU row
+lsl r10,z,32
+lss r11,z,0x8000
+stosw r10,r11,+4
+lsl r10,z,1
+stosw r10,r11,+0
+
 sub r3,r3,2048
 add r1,r1,1
 jne r8,r1,START_ROW_DETECT
 
-;; trigger npu
-;; write SSD
+;; Enable LED (wait NPU done)
+lss r12,z,0x4000
+lsl r13,z,0x21
+stosw r13,r12,+0
+
+;; WAIT FOR NPU_DONE
+lss r0,nz,0x8000
+lsl r0,nz,0x1000
+lsl r1,z,1
+POLL_NPU_DONE:
+lodsw r0,r2,+0
+jne r1,r2,POLL_NPU_DONE
+
+;; Read NPU result
+lodsw r0,r1,+4
+;; Write to SSD
+lss r0,z,0xC000
+stosw r1,r0,+0
+lsl r1,z,1
+stosw r1,r0,+4
 
 ;; Poll the push button
 jmp MAIN_ROUTINE_START
-LOOP_HERE:
-jmp LOOP_HERE
+;; LOOP_HERE:
+;; jmp LOOP_HERE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

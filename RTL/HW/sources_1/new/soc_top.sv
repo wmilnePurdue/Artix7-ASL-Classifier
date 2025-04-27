@@ -23,7 +23,8 @@
 
 module soc_top(
     input                   clk,
-    input                   resetn,
+    input                   reset,
+	output wire             pll_locked,
 
     // External-interface
     input  [`IN_IO-1:0]     ext_input_io,
@@ -111,6 +112,9 @@ wire [31:0]     ahb_out_unit_hwdata_o;
 wire            ahb_out_unit_hready_i;
 wire            ahb_out_unit_hresp_i;
 wire [31:0]     ahb_out_unit_hrdata_i;
+wire            resetn = ~reset;
+
+assign pll_locked = pll_en;
 
 cpu_core # (
     .AWID                (12                          )
@@ -279,8 +283,8 @@ spi_io SPI_INTERFACE (
 );
 `elsif SSD_OUTPUT
 ssd_io SSD_INTERFACE (
-    .clk(clk),
-    .resetn(resetn),
+    .clk                 (clk_int                  ),
+    .resetn              (resetn                   ),
     .ahb_s0_haddr_i      (ahb_out_unit_haddr_o     ),
     .ahb_s0_hwrite_i     (ahb_out_unit_hwrite_o    ),
     .ahb_s0_hsize_i      (ahb_out_unit_hsize_o     ),
@@ -309,10 +313,12 @@ ssd_io SSD_INTERFACE (
     wire pll_lock;
     logic pll_lock1, pll_lock2;
 
+    assign clk_int = cam_clk;
+
     pll_ip_core PLL_INST (
        .clk_in1  (clk        ),
        .resetn   (pll_reset  ),
-       .clk_out1 (clk_int    ),
+       // .clk_out1 (           ),
        .clk_out2 (cam_clk    ),
        .locked   (pll_lock   )
     );

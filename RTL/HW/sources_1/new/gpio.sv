@@ -47,15 +47,18 @@ for(genvar i0 = 0; i0 < INPUT_IO; i0++) begin : IO_GEN
             cdc_sync          <= 2'b00;
         end
         else begin
-            if(ahbl_clear_input_io[i0]) begin
-                ahbl_input_io[i0] <= 1'b0;
-                cdc_sync          <= 2'b00;
-            end
-            else if(~ahbl_input_io[i0]) begin
-                cdc_sync[0]       <= ext_input_io[i0];
-                cdc_sync[1]       <= cdc_sync[0];
-                ahbl_input_io[i0] <= cdc_sync[1];
-            end
+            cdc_sync[0]       <= ext_input_io[i0];
+            cdc_sync[1]       <= cdc_sync[0];
+            ahbl_input_io[i0] <= cdc_sync[1];
+            // if(ahbl_clear_input_io[i0]) begin
+            //     ahbl_input_io[i0] <= 1'b0;
+            //     cdc_sync          <= 2'b00;
+            // end
+            // else if(~ahbl_input_io[i0]) begin
+            //     cdc_sync[0]       <= ext_input_io[i0];
+            //     cdc_sync[1]       <= cdc_sync[0];
+            //     ahbl_input_io[i0] <= cdc_sync[1];
+            // end
         end
     end
 end
