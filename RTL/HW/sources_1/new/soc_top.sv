@@ -23,7 +23,8 @@
 
 module soc_top(
     input                   clk,
-    input                   resetn,
+    input                   reset,
+	output wire             pll_locked,
 
     // External-interface
     input  [`IN_IO-1:0]     ext_input_io,
@@ -111,7 +112,9 @@ wire [31:0]     ahb_out_unit_hwdata_o;
 wire            ahb_out_unit_hready_i;
 wire            ahb_out_unit_hresp_i;
 wire [31:0]     ahb_out_unit_hrdata_i;
+wire            resetn = ~reset;
 
+assign pll_locked = pll_en;
 wire [5:0]      row_info;
 
 cpu_core # (
