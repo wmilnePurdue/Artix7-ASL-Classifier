@@ -36,4 +36,4 @@ fprintf("MATLAB conv = %.6f\n", model_val_center);
 
 %%%%% Result by Devendra
 result = minibatchpredict(manually_qt_net, input_image, Outputs="conv_1");
-singleValue = result(2,2,1)
+fprintf("\nDev conv = %.6f\n", result(2,2,1));

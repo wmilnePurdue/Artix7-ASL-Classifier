@@ -46,22 +46,23 @@ input [4:0] ch_num;
 
 output hw_mem_wr; // latched till ack_p is set
 output [`LOG2_ACT_ADDR_WIDTH-1:0] hw_mem_wr_addr; 
-output [7:0] hw_mem_wr_data; 
+output [DATA_WIDTH-1:0] hw_mem_wr_data; 
 input  hw_mem_wr_ack_p; 
 
 output [2:0] bias_rd_addr;
 input signed [DATA_WIDTH-1:0] bias_rd_data;
 output act_overflow;
 
-output wire [7:0] fc2_layer_output_data;
+output wire [DATA_WIDTH-1:0] fc2_layer_output_data;
 output wire fc2_layer_output_valid_p;
 
 
 // Adding wire connections
-wire [7:0] mac_out;
+wire [DATA_WIDTH-1:0] mac_out;
 
 
-npu_mac u_npu_mac(
+npu_mac #(.DATA_WIDTH (DATA_WIDTH), .NUM_FRAC_BITS(NUM_FRAC_BITS))
+u_npu_mac(
    .clk                      (clk), 
    .rst                      (rst), 
    .mac_en                   (mac_en),
@@ -73,11 +74,12 @@ npu_mac u_npu_mac(
    .mac_valid                (mac_valid), 
    .mac_overflow             (mac_overflow),
    .npu_layer_in_progress    (npu_layer_in_progress),
-   .bias_rd_addr	         (bias_rd_addr), 
-   .bias_rd_data	         (bias_rd_data)
+   .bias_rd_addr	     (bias_rd_addr), 
+   .bias_rd_data	     (bias_rd_data)
 );
 
-npu_maxpool_relu u_npu_maxpool_relu(
+npu_maxpool_relu #(.DATA_WIDTH (DATA_WIDTH), .NUM_FRAC_BITS(NUM_FRAC_BITS))
+u_npu_maxpool_relu(
    .clk			     (clk), 
    .rst			     (rst), 
    .mac_valid		     (mac_valid), 
@@ -89,7 +91,7 @@ npu_maxpool_relu u_npu_maxpool_relu(
    .hw_mem_wr_ack_p	     (hw_mem_wr_ack_p),
    .ch_num		     (ch_num), 
    .bias_rd_addr	     (), 
-   .bias_rd_data	     (8'd0), 
+   .bias_rd_data	     ({DATA_WIDTH{1'b0}}), 
    .act_overflow             (act_overflow),
    .fc2_layer_output_data    (fc2_layer_output_data),
    .fc2_layer_output_valid_p (fc2_layer_output_valid_p)

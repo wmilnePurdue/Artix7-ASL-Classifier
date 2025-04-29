@@ -55,7 +55,10 @@ module ov7670_gpio # (
 	input  wire   [7:0]    p_data,
 						   
     inout                  i2c_scl,
-    inout                  i2c_sda
+    inout                  i2c_sda,
+
+    // External-interface
+    output logic  [5:0]    row_reg_o
 );
 
 localparam RW_REG_CNT = 7;
@@ -112,6 +115,15 @@ end
 
 assign r_reg[98] = {26'h0, row_o};      // 0x4008_0188
 assign r_reg[99] = {31'h0, pxl_idle_o}; // 0x4008_018C
+
+always_ff @ (posedge clk, negedge resetn) begin
+    if(~resetn) begin
+        row_reg_o <= '0;
+    end
+    else begin
+        row_reg_o <= row_o;
+    end
+end
 
 csr_regfile # (
     .RW_REG_CNT          (RW_REG_CNT          ),

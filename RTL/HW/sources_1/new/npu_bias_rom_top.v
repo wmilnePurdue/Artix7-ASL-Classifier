@@ -26,16 +26,18 @@ module npu_bias_rom_top(
 
 input clk;
 
+parameter DATA_WIDTH = 16;
+
 input [2:0] bias_rom_rd_addr; 
-output reg [32*8-1:0] bias_rom_rd_data;
+output reg [32*DATA_WIDTH-1:0] bias_rom_rd_data;
 
 integer j;
-wire [7:0] bias_rom_rd_data_arr [31:0];
+wire [DATA_WIDTH-1:0] bias_rom_rd_data_arr [31:0];
 
 always @ (*)
 begin
     for (j=0; j<32; j=j+1) begin
-        bias_rom_rd_data[8*j +: 8] = bias_rom_rd_data_arr[j];
+        bias_rom_rd_data[DATA_WIDTH*j +: DATA_WIDTH] = bias_rom_rd_data_arr[j];
     end
 end
 

@@ -28,8 +28,8 @@ module npu_maxpool_relu(
 	fc2_layer_output_data, fc2_layer_output_valid_p
     );
 
-parameter DATA_WIDTH = 8;
-parameter NUM_FRAC_BITS = 5;
+parameter DATA_WIDTH = 16;
+parameter NUM_FRAC_BITS = 10;
 
 input clk;
 input rst; 
@@ -41,7 +41,7 @@ input [4:0] ch_num;
 
 output reg hw_mem_wr; // latched till ack_p is set
 output reg [`LOG2_ACT_ADDR_WIDTH-1:0] hw_mem_wr_addr; 
-output wire [7:0] hw_mem_wr_data; 
+output wire [DATA_WIDTH-1:0] hw_mem_wr_data; 
 input  hw_mem_wr_ack_p; 
 
 output reg [2:0] bias_rd_addr;
@@ -67,18 +67,18 @@ wire conv_layer_in_progress = (npu_layer_in_progress == `CONV1_LAYER_ENC) | (npu
 assign hw_mem_wr_data        = max_result_r;
 assign fc2_layer_output_data = max_result_r;
 
-wire [8:0] num_of_output_pixel_per_ch_c = (conv_layer_in_progress == `CONV1_LAYER_ENC) ? `CONV1_NUM_PIXEL_OUT_PER_CH :
-					  (conv_layer_in_progress == `CONV2_LAYER_ENC) ? `CONV2_NUM_PIXEL_OUT_PER_CH :
-					  (conv_layer_in_progress == `CONV3_LAYER_ENC) ? `CONV3_NUM_PIXEL_OUT_PER_CH :
+wire [8:0] num_of_output_pixel_per_ch_c = (npu_layer_in_progress == `CONV1_LAYER_ENC) ? `CONV1_NUM_PIXEL_OUT_PER_CH :
+					  (npu_layer_in_progress == `CONV2_LAYER_ENC) ? `CONV2_NUM_PIXEL_OUT_PER_CH :
+					  (npu_layer_in_progress == `CONV3_LAYER_ENC) ? `CONV3_NUM_PIXEL_OUT_PER_CH :
 					  8'd1;
 
 wire [11:0] layer_act_mem_start_addr_offset_c = 
-				          (conv_layer_in_progress == `CONV1_LAYER_ENC) ? `CONV1_OUTPUT_START_ADDR:
-					  (conv_layer_in_progress == `CONV2_LAYER_ENC) ? `CONV2_OUTPUT_START_ADDR:
-					  (conv_layer_in_progress == `CONV3_LAYER_ENC) ? `CONV3_OUTPUT_START_ADDR:
-					  (conv_layer_in_progress == `FC1_1_LAYER_ENC) ? `FC1_1_OUTPUT_START_ADDR:
-					  (conv_layer_in_progress == `FC1_2_LAYER_ENC) ? `FC1_2_OUTPUT_START_ADDR:
-					  (conv_layer_in_progress == `FC2_LAYER_ENC) ? `FC2_OUTPUT_START_ADDR:
+				          (npu_layer_in_progress == `CONV1_LAYER_ENC) ? `CONV1_OUTPUT_START_ADDR:
+					  (npu_layer_in_progress == `CONV2_LAYER_ENC) ? `CONV2_OUTPUT_START_ADDR:
+					  (npu_layer_in_progress == `CONV3_LAYER_ENC) ? `CONV3_OUTPUT_START_ADDR:
+					  (npu_layer_in_progress == `FC1_1_LAYER_ENC) ? `FC1_1_OUTPUT_START_ADDR:
+					  (npu_layer_in_progress == `FC1_2_LAYER_ENC) ? `FC1_2_OUTPUT_START_ADDR:
+					  (npu_layer_in_progress == `FC2_LAYER_ENC) ? `FC2_OUTPUT_START_ADDR:
 					  12'hF20;
 
 // Add bias to MAC output
@@ -88,7 +88,7 @@ always @ (posedge clk, negedge rst)
 begin
    if (~rst) begin
        max_result_r     <= {DATA_WIDTH{1'b0}};
-       mac_plus_bias_r  <= {(DATA_WIDTH+1){1'b0}};
+       mac_plus_bias_r  <= {DATA_WIDTH{1'b0}};
        mod4_cnt         <= 2'd0;
        hw_mem_wr        <= 1'b0;
        hw_mem_wr_addr   <= {`LOG2_ACT_ADDR_WIDTH{1'b0}};

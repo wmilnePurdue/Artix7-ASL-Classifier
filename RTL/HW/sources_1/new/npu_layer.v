@@ -29,37 +29,40 @@ module npu_layer(
 	  fc2_layer_output_valid_p
     );
 
+parameter DATA_WIDTH = 16;
+parameter NUM_FRAC_BITS = 10;
+
 input clk;
 input rst; 
 
 input start_p;
 input last_p;
 input [31:0] mac_en;
-input [32*8-1:0] weight_in;
-input [7:0] act_in;
+input [32*DATA_WIDTH-1:0] weight_in;
+input [DATA_WIDTH-1:0] act_in;
 output [31:0] mac_overflow;
 
 input [2:0] npu_layer_in_progress;
 
 output [31:0] hw_mem_wr; // latched till ack_p is set
 output reg [(32*`LOG2_ACT_ADDR_WIDTH)-1:0] hw_mem_wr_addr; 
-output reg [32*8-1:0] hw_mem_wr_data; 
+output reg [32*DATA_WIDTH-1:0] hw_mem_wr_data; 
 input  [31:0] hw_mem_wr_ack_p; 
 
 output [2:0] bias_rd_addr;
-input  [32*8-1:0] bias_rd_data;
+input  [32*DATA_WIDTH-1:0] bias_rd_data;
 output [31:0] act_overflow;
 
-output reg [24*8-1:0] fc2_layer_output_data;
+output reg [24*DATA_WIDTH-1:0] fc2_layer_output_data;
 output fc2_layer_output_valid_p;
 
 integer j;
-reg [7:0] bias_rd_data_arr [31:0];
+reg [DATA_WIDTH-1:0] bias_rd_data_arr [31:0];
 wire [2:0] bias_rd_addr_arr [31:0];
-reg [7:0] weight_in_arr [31:0];
-wire [7:0] hw_mem_wr_data_arr [31:0];
+reg [DATA_WIDTH-1:0] weight_in_arr [31:0];
+wire [DATA_WIDTH-1:0] hw_mem_wr_data_arr [31:0];
 wire [`LOG2_ACT_ADDR_WIDTH-1:0] hw_mem_wr_addr_arr [31:0];
-wire [7:0] fc2_layer_output_data_arr[31:0];
+wire [DATA_WIDTH-1:0] fc2_layer_output_data_arr[31:0];
 
 reg [4:0] ch_num_arr [31:0]; 
 /*
@@ -79,21 +82,21 @@ begin
     for (j=0; j<32; j=j+1) begin
 //        bias_rd_addr[3*j +: 3] = bias_rd_addr_arr[j];
         hw_mem_wr_addr[(`LOG2_ACT_ADDR_WIDTH*j) +: `LOG2_ACT_ADDR_WIDTH] = hw_mem_wr_addr_arr[j];
-        hw_mem_wr_data[8*j +: 8] = hw_mem_wr_data_arr[j];
+        hw_mem_wr_data[DATA_WIDTH*j +: DATA_WIDTH] = hw_mem_wr_data_arr[j];
 
-        bias_rd_data_arr[j] = bias_rd_data[8*j +: 8];
-        weight_in_arr[j]    = weight_in[8*j +: 8];
+        bias_rd_data_arr[j] = bias_rd_data[DATA_WIDTH*j +: DATA_WIDTH];
+        weight_in_arr[j]    = weight_in[DATA_WIDTH*j +: DATA_WIDTH];
         ch_num_arr[j]       = j;
     end
     for (j=0; j<24; j=j+1) begin
-        fc2_layer_output_data[8*j +: 8] = fc2_layer_output_data_arr[j];
+        fc2_layer_output_data[DATA_WIDTH*j +: DATA_WIDTH] = fc2_layer_output_data_arr[j];
     end
 end
 
 genvar i;
 generate
 for (i=0; i<32;i=i+1) begin : neuron_instantiation
-    npu_neuron #(.DATA_WIDTH (8), .NUM_FRAC_BITS(5))
+    npu_neuron #(.DATA_WIDTH (DATA_WIDTH), .NUM_FRAC_BITS(NUM_FRAC_BITS))
     u_neuron (
         .clk                  (clk), 
 	.rst                  (rst),  

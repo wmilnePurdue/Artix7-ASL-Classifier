@@ -24,18 +24,20 @@ module npu_weights_rom_top(
       clk, weights_rom_rd_addr, weights_rom_rd_data
     );
 
+parameter DATA_WIDTH = 16;
+
 input clk;
 
 input [`LOG2_FILTER_MEM_ADDR_WIDTH-1:0] weights_rom_rd_addr; 
-output reg [32*8-1:0] weights_rom_rd_data;
-wire [7:0] weights_rom_rd_data_arr [31:0];
+output reg [32*DATA_WIDTH-1:0] weights_rom_rd_data;
+wire [DATA_WIDTH-1:0] weights_rom_rd_data_arr [31:0];
 
 integer j;
 
 always @ (*)
 begin
     for (j=0; j<32; j=j+1) begin
-        weights_rom_rd_data[8*j +: 8] = weights_rom_rd_data_arr[j];
+        weights_rom_rd_data[DATA_WIDTH*j +: DATA_WIDTH] = weights_rom_rd_data_arr[j];
     end
 end
 

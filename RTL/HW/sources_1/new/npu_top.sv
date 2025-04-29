@@ -18,7 +18,7 @@
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
-
+`include "npu_defines.vh"
 
 module npu_top(
     input                  clk,
@@ -61,29 +61,29 @@ wire [11:0] cpu_rgb_mem_addr_o;
 wire [7:0]  cpu_rgb_mem_wrdata_o;
 wire [7:0]  cpu_rgb_mem_rddata_i;
 wire [11:0] npu_act_mem_wr_addr;
-wire [7:0]  npu_act_mem_wr_data;
+wire [`NPU_ACT_DATA_WIDTH-1:0]  npu_act_mem_wr_data;
 wire [7:0]  npu_rgb_rddata;
-wire [7:0]  npu_act_mem_rd_data;
-wire [7:0]  npu_muxed_rgb_act_mem_rd_data;
+wire [`NPU_ACT_DATA_WIDTH-1:0]  npu_act_mem_rd_data;
+wire [`NPU_ACT_DATA_WIDTH-1:0]  npu_muxed_rgb_act_mem_rd_data;
 wire [12*32-1:0] hw_mem_wr_addr;
-wire [8*32-1:0]  hw_mem_wr_data;
+wire [`NPU_ACT_DATA_WIDTH*32-1:0]  hw_mem_wr_data;
 wire [31:0] hw_mem_wr_ack_p;
 wire [31:0] hw_mem_wr;
 
-wire [32*8-1:0] weights_rom_rd_data;
-wire [32*8-1:0] bias_rom_rd_data;
+wire [32*`NPU_ACT_DATA_WIDTH-1:0] weights_rom_rd_data;
+wire [32*`NPU_ACT_DATA_WIDTH-1:0] bias_rom_rd_data;
 wire [2:0]      bias_rom_rd_addr; 
-wire [24*8-1:0] fc2_layer_output_data;
+wire [24*`NPU_ACT_DATA_WIDTH-1:0] fc2_layer_output_data;
 wire            fc2_layer_output_valid_p;
 
 //temporary assignments to enable synthesis
 
 npu_control_unit NPU_CTRL(
-   .npu_clk				          (clk), 
-   .npu_rst_n				      (resetn),
-   .cfg_write_row_p			      (write_row), 
+   .npu_clk			              (clk), 
+   .npu_rst_n			          (resetn),
+   .cfg_write_row_p		          (write_row), 
    .cfg_thrshld_num_rows_to_start (npu_thrshld_num_rows_to_start),
-   .softmax_result_valid_p		  (softmax_result_valid_p), 
+   .softmax_result_valid_p	      (softmax_result_valid_p), 
    .softmax_class_predicted		  (softmax_class_predicted),
    .npu_active				      (npu_active), 
    .npu_done				      (npu_done), 
@@ -172,9 +172,10 @@ npu_act_mem ACTIVATION_MEM (
     .douta (),
 						      
     .clkb  (clk               ),
+    .enb   (activation_mem_rd_en),
     .web   (1'b0              ), // NPU read port
     .addrb (activation_mem_rd_addr[11:0]),
-    .dinb  (8'd0              ),
+    .dinb  ({`NPU_ACT_DATA_WIDTH{1'b0}}),
     .doutb (npu_act_mem_rd_data)
     );
 
@@ -196,12 +197,12 @@ npu_img_act_mem_ctrl NPU_IMG_ACT_CTRL(
     .hw_mem_wr_ack_p                (hw_mem_wr_ack_p) 
     );
 
-npu_layer NPU_LAYER_UNIT(
-   .clk			             (clk),    
+npu_layer #(.DATA_WIDTH (`NPU_ACT_DATA_WIDTH), .NUM_FRAC_BITS(`NPU_NUM_FRAC_BITS)) NPU_LAYER_UNIT (
+   .clk			     (clk),    
    .rst                      (resetn), 
    .start_p 	             (mac_start_p),
    .last_p                   (mac_last_p),
-   .mac_en		             (mac_enable), 
+   .mac_en		     (mac_enable), 
    .weight_in                (weights_rom_rd_data), 
    .act_in                   (npu_muxed_rgb_act_mem_rd_data), 
    .mac_overflow             (mac_overflow), 
@@ -210,26 +211,26 @@ npu_layer NPU_LAYER_UNIT(
    .hw_mem_wr_addr           (hw_mem_wr_addr), 
    .hw_mem_wr_data           (hw_mem_wr_data), 
    .hw_mem_wr_ack_p          (hw_mem_wr_ack_p), 
-   .bias_rd_addr	         (bias_rom_rd_addr), 
+   .bias_rd_addr	     (bias_rom_rd_addr), 
    .bias_rd_data             (bias_rom_rd_data), 
-   .act_overflow	         (act_overflow),
+   .act_overflow	     (act_overflow),
    .fc2_layer_output_data    (fc2_layer_output_data),
    .fc2_layer_output_valid_p (fc2_layer_output_valid_p)
     );
 
-npu_weights_rom_top NPU_WEIGHTS_ROM(
+npu_weights_rom_top #(.DATA_WIDTH (`NPU_ACT_DATA_WIDTH)) NPU_WEIGHTS_ROM(
     .clk		    (clk), 
     .weights_rom_rd_addr    (filter_mem_rd_addr), 
     .weights_rom_rd_data    (weights_rom_rd_data)
     );
 
-npu_bias_rom_top NPU_BIAS_ROM(
+npu_bias_rom_top #(.DATA_WIDTH (`NPU_ACT_DATA_WIDTH)) NPU_BIAS_ROM(
     .clk		    (clk), 
     .bias_rom_rd_addr       (bias_rom_rd_addr), 
     .bias_rom_rd_data       (bias_rom_rd_data)
     );
 
-softmax SFTMAX(
+softmax #(.DATA_WIDTH (`NPU_ACT_DATA_WIDTH)) SFTMAX(
     .clk		   (clk),
     .resetn                (resetn),
     .data_in               (fc2_layer_output_data), 
