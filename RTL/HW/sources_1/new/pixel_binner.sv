@@ -112,7 +112,11 @@ always_ff @ (posedge clk, negedge resetn) begin
                 end
             end
             PXL_TRIM_START : begin
-                if(data_ready) begin
+                if(~start_en) begin
+                    pixel_state <= PXL_IDLE;
+                    pxl_idle_o  <= 1'b1;
+                end
+                else if(data_ready) begin
                     col_ptr <= col_ptr + 1'b1;
                     if(col_ptr == col_limit) begin
                         pixel_state   <= PXL_AGGREGATE;
@@ -132,7 +136,11 @@ always_ff @ (posedge clk, negedge resetn) begin
                 end
             end
             PXL_AGGREGATE : begin
-                if(data_ready) begin
+                if(~start_en) begin
+                    pixel_state <= PXL_IDLE;
+                    pxl_idle_o  <= 1'b1;
+                end
+                else if(data_ready) begin
                     col_ptr <= col_ptr + 1'b1;
                     rg_b <= ~rg_b;
                     if(~rg_b) begin
@@ -168,7 +176,11 @@ always_ff @ (posedge clk, negedge resetn) begin
                 end
             end
             PXL_TRIM_END : begin
-                if(data_ready) begin
+                if(~start_en) begin
+                    pixel_state <= PXL_IDLE;
+                    pxl_idle_o  <= 1'b1;
+                end
+                else if(data_ready) begin
                     col_ptr <= col_ptr + 1'b1;
                     if(col_ptr == 11'd1279) begin
                         col_ptr     <= 11'h0;
@@ -178,7 +190,11 @@ always_ff @ (posedge clk, negedge resetn) begin
                 end
             end
             PXL_DONE : begin
-                if(col_ptr == 11'd1279) begin
+                if(~start_en) begin
+                    pixel_state <= PXL_IDLE;
+                    pxl_idle_o  <= 1'b1;
+                end
+                else if(col_ptr == 11'd1279) begin
                     if(~start_en) begin
                         pixel_state <= PXL_IDLE;
                         pxl_idle_o  <= 1'b1;

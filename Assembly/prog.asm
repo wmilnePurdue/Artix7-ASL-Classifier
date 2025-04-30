@@ -447,10 +447,6 @@ POLL_GPIO_IF_LOW:
 lodsw r0,r3,+0
 and r3,r3,r1
 jne r3,r2,POLL_GPIO_IF_LOW
-;; lss r0,z,0x4000
-;; lsl r1,z,1
-;; stosw r1,r0,+4
-;; stosw r2,r0,+4
 
 ;; Enable LED (as waiting data)
 lss r12,z,0x4000
@@ -458,16 +454,20 @@ lsl r13,z,0x9
 stosw r13,r12,+0
 
 ;; START Camera/NPU processing
-lsl r0,nz,$START_PXL_LO
-lss r0,nz,$START_PXL_HI
+;; Disable sampling logic
+lss r0,z,$START_PXL_HI
 lsl r1,z,0
-stosw r1,r0,+0
+stosw r1,r0,+20
+;; POLL if camera can be started
+lss r0,z,0x4008
+lsl r4,z,3
+POLL_IS_CAM_IDLE:
+lodsw r0,r3,+396
+jne r3,r4,POLL_IS_CAM_IDLE
+;; Start Camera
+lss r0,z,$START_PXL_HI
 lsl r1,z,1
-;; add nop instruction for synchronization
-mul r1,r1,r1,l
-;; end nop
-lsl r1,z,1
-stosw r1,r0,+0
+stosw r1,r0,+20
 
 lss r3,nz,$NPU_RGB_HI
 lsl r3,nz,$NPU_RED_LO
@@ -487,10 +487,21 @@ APPLY_ZERO_SHIFT:
 lsl r9,z,0
 
 POLL_ROW:
+;; Check if Camera IDLE
+lsl r12,z,4
+lodsw r0,r13,+396
+and r13,r13,r12
+je r13,r12,BYPASS_POLL_ROW
+
 ;; 0x0188 = 392
 lodsw r0,r2,+392
 jne r2,r1,POLL_ROW
+jmp PROCESS_ROW
 
+BYPASS_POLL_ROW:
+add r2,r2,1
+
+PROCESS_ROW:
 ;; Enable LED (received at least 1 data)
 lss r12,z,0x4000
 lsl r13,z,0x11

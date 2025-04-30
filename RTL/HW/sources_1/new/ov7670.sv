@@ -40,6 +40,8 @@ module ov7670(
     output logic  [5:0]  row_o,
 
     output logic         pxl_idle_o,
+    output logic         cam_read_busy_o,
+    output logic         cam_vsync_trig_o,
 
 // must be set false path (clk synchronized)
     input  wire          cont_read,
@@ -57,8 +59,6 @@ module ov7670(
 wire       get_data;
 wire [7:0] p_data_sync;
 wire       data_ready;
-
-wire       cam_read_busy;
 
 i2c_io I2C_IO (
     .clk        (clk          ),
@@ -79,47 +79,48 @@ camera_io CAMERA (
 //  ------------
 //  clk domain
 //  ------------
-    .clk           (clk             ),
-    .resetn        (resetn          ),
-								    
-    .get_data      (get_data        ),
-    .p_data_sync   (p_data_sync     ),
-    .data_ready    (data_ready      ),
-// must be synchronized to clk      
-    .cam_read_busy (cam_read_busy   ),
+    .clk            (clk              ),
+    .resetn         (resetn           ),
+									  
+    .get_data       (get_data         ),
+    .p_data_sync    (p_data_sync      ),
+    .data_ready     (data_ready       ),
+// must be synchronized to clk        
+    .cam_read_busy  (cam_read_busy_o  ),
+    .cam_vsync_trig (cam_vsync_trig_o ),
 // must be synchronized to p_clock  
-    .start_en      (pxl_start_en    ),
+    .start_en       (pxl_start_en     ),
 
 //  ---------------
 //  p_clock domain
 //  ---------------
 
 // must be set false path (clk synchronized)
-   .cont_read      (cont_read     ),
-							      
-   .p_clock        (p_clock       ),
-   .vsync          (vsync         ),
-   .href           (href          ),
-   .p_data         (p_data        )
+   .cont_read       (cont_read       ),
+								     
+   .p_clock         (p_clock         ),
+   .vsync           (vsync           ),
+   .href            (href            ),
+   .p_data          (p_data          )
 );
 
 pixel_binner PIXEL_BIN (
-    .clk           (clk             ),
-    .resetn        (resetn          ),
-				        
-    .start_en      (pxl_start_en    ),
-				  
-    .r_data        (r_data          ),
-    .g_data        (g_data          ),
-    .b_data        (b_data          ),
-    .row_o         (row_o           ),
-
-    .pxl_idle_o    (pxl_idle_o      ),
-
-// FIFO Interface
-    .get_data      (get_data        ),
-    .p_data_sync   (p_data_sync     ),
-    .data_ready    (data_ready      )
+    .clk            (clk             ),
+    .resetn         (resetn          ),
+				         
+    .start_en       (pxl_start_en    ),
+				    
+    .r_data         (r_data          ),
+    .g_data         (g_data          ),
+    .b_data         (b_data          ),
+    .row_o          (row_o           ),
+				    
+    .pxl_idle_o     (pxl_idle_o      ),
+				    
+// FIFO Interface   
+    .get_data       (get_data        ),
+    .p_data_sync    (p_data_sync     ),
+    .data_ready     (data_ready      )
 );
 
 endmodule

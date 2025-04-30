@@ -32,6 +32,7 @@ module camera_io(
     output               data_ready,
 // must be synchronized to clk
     output logic         cam_read_busy,
+    output logic         cam_vsync_trig,
 
 //  ---------------
 //  p_clock domain
@@ -62,13 +63,14 @@ typedef enum bit[2:0] {
 cam_state_t  cam_state;
 logic [1:0]  start_en_sync;
 logic        cam_busy_reg;
+logic        cam_vsync_trig_pclk;
 
 logic        fifo_wr_en;
 
 //  ------------
 //  clk domain
 //  ------------
-
+logic  cam_vsync_sync;
 logic  cam_busy_sync;
 wire   empty_flag;
 assign data_ready = ~empty_flag;
@@ -80,11 +82,13 @@ assign data_ready = ~empty_flag;
 
 always_ff @ (posedge p_clock, negedge resetn) begin
     if(~resetn) begin
-        start_en_sync <= 2'b00;
+        start_en_sync       <= 2'b00;
+        cam_vsync_trig_pclk <= 1'b0;
     end
     else begin
-        start_en_sync[0] <= start_en;
-        start_en_sync[1] <= start_en_sync[0];
+        start_en_sync[0]    <= start_en;
+        start_en_sync[1]    <= start_en_sync[0];
+        cam_vsync_trig_pclk <= (cam_state == CAM_CAPTURE_END);
     end
 end
 
@@ -139,12 +143,16 @@ end
 //  ------------------
 always_ff @ (posedge clk, negedge resetn) begin
     if(~resetn) begin
-        cam_read_busy <= 1'b0;
-        cam_busy_sync <= 1'b0;
+        cam_read_busy  <= 1'b0;
+        cam_busy_sync  <= 1'b0;
+        cam_vsync_trig <= 1'b0;
+        cam_vsync_sync <= 1'b0;
     end
     else begin
-        cam_read_busy <= cam_busy_sync;
-        cam_busy_sync <= cam_busy_reg;
+        cam_read_busy  <= cam_busy_sync;
+        cam_busy_sync  <= cam_busy_reg;
+        cam_vsync_sync <= cam_vsync_trig_pclk;
+        cam_vsync_trig <= cam_vsync_sync;
     end
 end
 

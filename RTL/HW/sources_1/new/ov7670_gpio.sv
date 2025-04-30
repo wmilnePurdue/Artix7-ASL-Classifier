@@ -89,6 +89,8 @@ wire [15:0]         b_data [1:0][31:0];
 
 wire  [5:0]         row_o;
 wire                cont_read;
+wire                cam_read_busy_o;
+wire                cam_vsync_trig_o;
 
 // Memory Map assignment
 // R/W registers
@@ -114,7 +116,7 @@ for (genvar i0 = 0; i0 < 32; i0++) begin
 end
 
 assign r_reg[98] = {26'h0, row_o};      // 0x4008_0188
-assign r_reg[99] = {31'h0, pxl_idle_o}; // 0x4008_018C
+assign r_reg[99] = {29'h0, cam_vsync_trig_o, ~cam_read_busy_o, pxl_idle_o}; // 0x4008_018C
 
 always_ff @ (posedge clk, negedge resetn) begin
     if(~resetn) begin
@@ -165,37 +167,39 @@ gpio # (
 );
 
 ov7670 CAMERA_UNIT (
-    .clk                 (clk          ),
-    .resetn              (resetn       ),
-									   
-    .i2c_start_en        (i2c_start_en ),
-									   
-    .i2c_addr_i          (i2c_addr_i   ),
-    .i2c_data_i          (i2c_data_i   ),
-    .delay_i             (delay_i      ),
-									   
-    .i2c_ready_o         (i2c_ready_o  ),
-									   
-    .pxl_start_en        (pxl_start_en ),
-									   
-    .r_data              (r_data       ),
-    .g_data              (g_data       ),
-    .b_data              (b_data       ),
-    .row_o               (row_o        ),
-
-    .pxl_idle_o          (pxl_idle_o   ),
+    .clk                 (clk             ),
+    .resetn              (resetn          ),
+									       
+    .i2c_start_en        (i2c_start_en    ),
+									       
+    .i2c_addr_i          (i2c_addr_i      ),
+    .i2c_data_i          (i2c_data_i      ),
+    .delay_i             (delay_i         ),
+									       
+    .i2c_ready_o         (i2c_ready_o     ),
+									       
+    .pxl_start_en        (pxl_start_en    ),
+									       
+    .r_data              (r_data          ),
+    .g_data              (g_data          ),
+    .b_data              (b_data          ),
+    .row_o               (row_o           ),
+									       
+    .pxl_idle_o          (pxl_idle_o      ),
 
 // must be set false path (clk synchronized)
-    .cont_read           (cont_read    ),
+    .cont_read           (cont_read       ),
+    .cam_read_busy_o     (cam_read_busy_o ),
+    .cam_vsync_trig_o    (cam_vsync_trig_o ),
 
 // External Interface    
-    .p_clock             (p_clock      ),
-    .vsync               (vsync        ),
-    .href                (href         ),
-    .p_data              (p_data       ),
-								       
-    .i2c_scl             (i2c_scl      ),
-    .i2c_sda             (i2c_sda      )
+    .p_clock             (p_clock         ),
+    .vsync               (vsync           ),
+    .href                (href            ),
+    .p_data              (p_data          ),
+								          
+    .i2c_scl             (i2c_scl         ),
+    .i2c_sda             (i2c_sda         )
 );
 
 ov7670clk_gen CLK_GENERATOR (

@@ -33,14 +33,16 @@ module ov7670_model(
     input              i2c_sda
 );
 
-localparam TP       = 2;
-localparam TLINE    = 784 * TP;
-localparam TDEL_V2H = 17 * TLINE;
-localparam TVSYNC   = 3 * TLINE;
-localparam TDEL_H2V = 10 * TLINE;
-localparam V_LINE   = 480;
-localparam H_LINE   = 640;
-localparam H_DELAY  = 144*TP;
+localparam TP          = 2;
+localparam TLINE       = 784 * TP;
+localparam TDEL_V2H    = 17 * TLINE;
+localparam TVSYNC      = 3 * TLINE;
+localparam TDEL_H2V    = 10 * TLINE;
+localparam V_LINE      = 480;
+localparam H_LINE      = 640;
+localparam H_DELAY     = 144*TP;
+localparam CORRUPT_EN  = 0;
+localparam CORRUPT_CNT = 100;
 
 logic [3:0]  counter;
 logic [23:0] mem_src [307200-1:0];
@@ -101,7 +103,12 @@ initial begin
         for(integer i0 = 0; i0 < V_LINE; i0++) begin
             for(integer i1 = 0; i1 < H_LINE; i1++) begin
                 p_data <= {1'b0, mem_ptr[23:19], mem_ptr[15:14]};
-                href   <= 1'b1;
+                if((CORRUPT_EN == 1) && (i0 == V_LINE-1) && (i1 >= (H_LINE - (CORRUPT_CNT + 1)))) begin
+				    href   <= 1'b0;
+                end
+                else begin
+                    href   <= 1'b1;
+                end
                 @(posedge p_clock);
                 p_data <= {mem_ptr[13:11], mem_ptr[7:3]};
                 addr   <= addr + 1'b1;
