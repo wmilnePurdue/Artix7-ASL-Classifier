@@ -53,7 +53,9 @@ npu_top NPU (
 
     .ahb_s0_hready_o     (ahb_s0_hready_i    ),
     .ahb_s0_hresp_o      (ahb_s0_hresp_i     ),
-    .ahb_s0_hrdata_o     (ahb_s0_hrdata_i    )
+    .ahb_s0_hrdata_o     (ahb_s0_hrdata_i    ),
+    .test_mode_i         (1'b1               ),
+    .test_img_index_i    (2'd0               )
 );
 
 ahb_master AHB_CTRL (                                      

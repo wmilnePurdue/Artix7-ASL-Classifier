@@ -193,7 +193,8 @@ end
 temp2D_fc2 = reshape(fc2_int16, [OutDim_fc2, InDim_fc2]);
 
 
-fc2_reordered_arr = temp2D_fc2(:);  
+% fc2_reordered_arr = temp2D_fc2(:);  
+fc2_reordered_arr = reshape(temp2D_fc2',1,[])
 fc2_reordered_hex = '';
 for i = 1:length(fc2_reordered_arr)
     val = fc2_reordered_arr(i);

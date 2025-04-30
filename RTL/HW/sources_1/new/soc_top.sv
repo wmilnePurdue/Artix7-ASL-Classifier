@@ -251,7 +251,9 @@ npu_top NPU (
 
     .ahb_s0_hready_o     (ahb_npu_accel_hready_i    ),
     .ahb_s0_hresp_o      (ahb_npu_accel_hresp_i     ),
-    .ahb_s0_hrdata_o     (ahb_npu_accel_hrdata_i    )
+    .ahb_s0_hrdata_o     (ahb_npu_accel_hrdata_i    ),
+    .test_mode_i         (ext_input_io[3]),
+    .test_img_index_i    (ext_input_io[2:1])
 );
 
 `else

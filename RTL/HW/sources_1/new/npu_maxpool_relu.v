@@ -146,11 +146,12 @@ begin
       	           max_result_r <= mac_plus_bias_r;
 	           end
 	       // FC2 layer - No max pool function; No Relu
-           end else if (npu_layer_in_progress == `FC2_LAYER_ENC) begin
+      //     end else if ((npu_layer_in_progress == `FC2_LAYER_ENC) | (npu_layer_in_progress == `FC1_LAYER_ENC)) begin
+           end else begin
       	       max_result_r <= mac_plus_bias_r;
 	       // FC1 layer - No max pool function; Only Relu
-           end else begin   
-      	       max_result_r <= mac_plus_bias_r[DATA_WIDTH-1] ? {DATA_WIDTH{1'b0}} : mac_plus_bias_r;
+      //     end else begin   
+      //	       max_result_r <= mac_plus_bias_r[DATA_WIDTH-1] ? {DATA_WIDTH{1'b0}} : mac_plus_bias_r;
 		   end
        end
 

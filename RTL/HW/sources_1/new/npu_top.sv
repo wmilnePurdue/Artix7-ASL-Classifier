@@ -32,6 +32,9 @@ module npu_top(
     input  wire [1:0]      ahb_s0_htrans_i,
     input  wire            ahb_s0_hmastlock_i,
     input  wire [31:0]     ahb_s0_hwdata_i,
+    
+    input  wire            test_mode_i,
+    input  wire [1:0]      test_img_index_i,
 						   
     output logic           ahb_s0_hready_o,
     output                 ahb_s0_hresp_o,
@@ -75,6 +78,7 @@ wire [32*`NPU_ACT_DATA_WIDTH-1:0] bias_rom_rd_data;
 wire [2:0]      bias_rom_rd_addr; 
 wire [24*`NPU_ACT_DATA_WIDTH-1:0] fc2_layer_output_data;
 wire            fc2_layer_output_valid_p;
+wire [`NPU_ACT_DATA_WIDTH-1:0] test_img_rdata;     
 
 //temporary assignments to enable synthesis
 
@@ -194,7 +198,9 @@ npu_img_act_mem_ctrl NPU_IMG_ACT_CTRL(
     .hw_mem_wr                      (hw_mem_wr),
     .hw_mem_wr_addr                 (hw_mem_wr_addr), 
     .hw_mem_wr_data                 (hw_mem_wr_data), 
-    .hw_mem_wr_ack_p                (hw_mem_wr_ack_p) 
+    .hw_mem_wr_ack_p                (hw_mem_wr_ack_p),
+    .test_img_rdata                 (test_img_rdata),
+    .test_mode_i                    (test_mode_i) 
     );
 
 npu_layer #(.DATA_WIDTH (`NPU_ACT_DATA_WIDTH), .NUM_FRAC_BITS(`NPU_NUM_FRAC_BITS)) NPU_LAYER_UNIT (
@@ -239,5 +245,12 @@ softmax #(.DATA_WIDTH (`NPU_ACT_DATA_WIDTH)) SFTMAX(
     .idx_out	           (softmax_class_predicted),
     .valid_o               (softmax_result_valid_p)    
     );
+
+test_image_rom TEST_IMG_ROM
+   (
+    .clka (clk),
+    .addra({test_img_index_i,activation_mem_rd_addr[11:0]}),
+    .douta (test_img_rdata)
+  );
 
 endmodule

@@ -38,7 +38,10 @@ module npu_img_act_mem_ctrl(
     input  wire [31:0]     hw_mem_wr, // latched till ack_p is set
     input  wire [32*`LOG2_ACT_ADDR_WIDTH-1:0] hw_mem_wr_addr, 
     input  wire [32*`NPU_ACT_DATA_WIDTH-1:0] hw_mem_wr_data, 
-    output wire [31:0]     hw_mem_wr_ack_p 
+    output wire [31:0]     hw_mem_wr_ack_p,
+    
+    input  wire            test_mode_i,
+    input  wire [15:0]     test_img_rdata
 
 );
 
@@ -120,7 +123,8 @@ begin
         hw_act_mem_rd_bypass_r1 <= hw_act_mem_rd_bypass;
 	// Bypass is set for Pad in Conv layer
 	npu_muxed_rgb_act_mem_rd_data <= (hw_act_mem_rd_bypass_r1) ? {`NPU_ACT_DATA_WIDTH{1'b0}} : 
-				         (hw_rgb_mem_rd_r1) ? {3'd0,npu_rgb_rddata,5'd0} : npu_act_mem_rd_data;
+				         (hw_rgb_mem_rd_r1) ? (test_mode_i ? test_img_rdata : {3'd0,npu_rgb_rddata,5'd0})
+				          : npu_act_mem_rd_data;
 	
 	if (atleast_one_wr_set_c) begin
 	    wr_service_cnt_r <= wr_service_cnt_r + 5'd1;
