@@ -37,6 +37,7 @@ wire [31:0]     ahb_s0_hwdata_o;
 wire            ahb_s0_hready_i;
 wire            ahb_s0_hresp_i;
 wire [31:0]     ahb_s0_hrdata_i;
+wire [1:0]      test_img_index_o;
 
 npu_top NPU (
     .clk                 (clk_i              ), 
@@ -55,7 +56,7 @@ npu_top NPU (
     .ahb_s0_hresp_o      (ahb_s0_hresp_i     ),
     .ahb_s0_hrdata_o     (ahb_s0_hrdata_i    ),
     .test_mode_i         (1'b1               ),
-    .test_img_index_i    (2'd0               )
+    .test_img_index_i    (test_img_index_o   )
 );
 
 ahb_master AHB_CTRL (                                      
@@ -73,7 +74,8 @@ ahb_master AHB_CTRL (
 												      
     .ahb_hready_i        (ahb_s0_hready_i    ),
     .ahb_hresp_i         (ahb_s0_hresp_i     ),
-    .ahb_hrdata_i        (ahb_s0_hrdata_i    )
+    .ahb_hrdata_i        (ahb_s0_hrdata_i    ),
+    .test_img_index_o    (test_img_index_o   )
 );         
 
 initial begin

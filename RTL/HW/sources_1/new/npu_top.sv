@@ -112,7 +112,8 @@ npu_control_unit NPU_CTRL(
    .mac_overflow                  (mac_overflow),
    .mac_overflow_lat_r            (mac_overflow_lat_r),
    .act_overflow                  (act_overflow),
-   .act_overflow_lat_r            (act_overflow_lat_r)
+   .act_overflow_lat_r            (act_overflow_lat_r),
+   .test_mode_i                   (test_mode_i)
    );
 
 npu_ahb_decoder DECODER (

@@ -32,13 +32,14 @@ module npu_control_unit(
     cur_state_conv1_c, cur_state_conv2_c, cur_state_conv3_c,
     cur_state_fc1_1_c, cur_state_fc1_2_c, cur_state_fc2_c,
     mac_overflow, act_overflow, mac_overflow_lat_r,
-    act_overflow_lat_r
+    act_overflow_lat_r, test_mode_i
 );
 // Clock, reset
 input npu_clk;
 input npu_rst_n;
 
 // Config
+input test_mode_i;
 input cfg_write_row_p; // pulse indicating that CPU has written 32x3 image pixels 
 input [5:0] cfg_thrshld_num_rows_to_start; // start after programmed threshold num of rows updated by CPU
 
@@ -625,7 +626,8 @@ begin
 end 
 
 // State Machine
-wire trigger_npu_c = (img_num_rows_written >= cfg_thrshld_num_rows_to_start) & (|cfg_thrshld_num_rows_to_start);
+wire trigger_npu_c = (~test_mode_i & (img_num_rows_written >= cfg_thrshld_num_rows_to_start) & (|cfg_thrshld_num_rows_to_start)) 
+                     | (test_mode_i & cfg_write_row_p);
 
 always @ (*)
 begin

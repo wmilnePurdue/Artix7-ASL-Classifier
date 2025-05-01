@@ -32,6 +32,7 @@ module ahb_master(
     output logic [1:0]   ahb_htrans_o,
     output logic         ahb_hmastlock_o,
     output logic [31:0]  ahb_hwdata_o,
+    output wire [1:0]   test_img_index_o,
 
     input                ahb_hready_i,
     input                ahb_hresp_i,
@@ -105,7 +106,8 @@ parameter MEM_INIT_FILE_23 = "D:/Devendra/Purdue_MS/Courses/Embedded_Systems/Pro
 // parameter MEM_INIT_FILE_21 = "D:/Devendra/Purdue_MS/Courses/Embedded_Systems/Project/HandDetect_SoC/Artix7-ASL-Classifier/hex_test_img2_resize_quant2/w.hex";
 // parameter MEM_INIT_FILE_22 = "D:/Devendra/Purdue_MS/Courses/Embedded_Systems/Project/HandDetect_SoC/Artix7-ASL-Classifier/hex_test_img2_resize_quant2/x.hex";
 // parameter MEM_INIT_FILE_23 = "D:/Devendra/Purdue_MS/Courses/Embedded_Systems/Project/HandDetect_SoC/Artix7-ASL-Classifier/hex_test_img2_resize_quant2/y.hex";
-
+assign test_img_index_o = test_img_cnt[1:0];
+ 
 initial begin
 
     ahb_haddr_o      <= '0;
@@ -118,6 +120,7 @@ initial begin
     ahb_hwdata_o     <= '0;
     test_img_cnt     <= 5'd0;
     test_success_cnt <= 5'd0;
+   
     @(posedge resetn);
     @(posedge clk);
     // ahb_write(32'h8000_0004, 8'h1);
@@ -153,7 +156,7 @@ initial begin
        5'd22: $readmemh(MEM_INIT_FILE_22, rgb_mem_test);
        5'd23: $readmemh(MEM_INIT_FILE_23, rgb_mem_test);
        endcase
-       for(integer i0 = 0; i0 < 32; i0 = i0+1) begin
+       for(integer i0 = 0; i0 < 4; i0 = i0+1) begin
           for(integer i1 = 0; i1 < 32; i1 = i1 + 1) begin
             ahb_write(32'h8000_2000 + i0*32 + i1, rgb_mem_test[(i0*32)+i1]); 
             ahb_write(32'h8000_2400 + i0*32 + i1, rgb_mem_test[((i0+32)*32)+i1]); 
