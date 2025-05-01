@@ -437,7 +437,7 @@ stosw r13,r12,+0
 ;; POLL if GPIO has triggered
 
 lss r0,z,0x4008
-lsl r1,z,0x00FF
+lsl r1,z,0x0001
 lsl r2,z,0
 POLL_GPIO_IF_HIGH:
 lodsw r0,r3,+0
@@ -447,6 +447,11 @@ POLL_GPIO_IF_LOW:
 lodsw r0,r3,+0
 and r3,r3,r1
 jne r3,r2,POLL_GPIO_IF_LOW
+
+lsl r1,z,0x0008
+lodsw r0,r3,+0
+and r3,r3,r1
+je r3,r1,RUN_ALT_FLOW
 
 ;; Enable LED (as waiting data)
 lss r12,z,0x4000
@@ -475,6 +480,12 @@ lsl r4,z,$RGB_DIVISOR
 lss r5,z,$MASK_DATA
 lss r7,nz,0x4008
 lsl r8,z,33
+
+lsl r12,z,0
+lsl r13,z,0
+stosw r12,r13,+0
+stosw r12,r13,+1
+stosw r12,r13,+2
 
 START_ROW_DETECT:
 lss r0,z,$ROW_READ_HI
@@ -508,34 +519,64 @@ lsl r13,z,0x11
 stosw r13,r12,+0
 
 ;; Write Data to NPU
+lsl r10,z,0
 lsl r0,nz,$PXL_RED_START_LO
 lsl r7,nz,$PXL_RED_LIMIT
 call r15,STORE_RESULT
 
+lsl r10,z,1
 lsl r7,nz,$PXL_BLUE_LIMIT
 add r3,r3,992
 call r15,STORE_RESULT
 
+lsl r10,z,2
 lsl r7,nz,$PXL_GREEN_LIMIT
 add r3,r3,992
 call r15,STORE_RESULT
+
+sub r3,r3,2048
+add r1,r1,1
+jne r8,r1,START_ROW_DETECT
+
+lsl r10,z,0
+lsl r11,z,0
+lodsw r11,r10,+0
+shr r10,r10,10
+lss r11,z,0x8000
+stosw r10,r11,+11264
+
+lsl r10,z,0
+lsl r11,z,1
+lodsw r11,r10,+0
+shr r10,r10,10
+lss r11,z,0x8000
+stosw r10,r11,+11265
+
+lsl r10,z,0
+lsl r11,z,2
+lodsw r11,r10,+0
+shr r10,r10,10
+lss r11,z,0x8000
+stosw r10,r11,+11266
 
 ;; Write NPU row
 lsl r10,z,32
 lss r11,z,0x8000
 stosw r10,r11,+4
 lsl r10,z,1
+lsl r12,z,0
+lsl r13,z,32
+WRITE_NPU_ROW:
 stosw r10,r11,+0
-
-sub r3,r3,2048
-add r1,r1,1
-jne r8,r1,START_ROW_DETECT
+add r12,r12,1
+jne r12,r13,WRITE_NPU_ROW
 
 ;; Enable LED (wait NPU done)
 lss r12,z,0x4000
 lsl r13,z,0x21
 stosw r13,r12,+0
 
+WAIT_NPU_DONE:
 ;; WAIT FOR NPU_DONE
 lss r0,nz,0x8000
 lsl r0,nz,0x1000
@@ -554,8 +595,15 @@ stosw r1,r0,+4
 
 ;; Poll the push button
 jmp MAIN_ROUTINE_START
-;; LOOP_HERE:
-;; jmp LOOP_HERE
+
+RUN_ALT_FLOW:
+;; Write NPU row
+lsl r10,z,32
+lss r11,z,0x8000
+stosw r10,r11,+4
+lsl r10,z,1
+stosw r10,r11,+0
+jmp WAIT_NPU_DONE
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -582,6 +630,10 @@ jne r1,r8,I2C_DELAY_LOOP
 ret r15
 
 STORE_RESULT:
+;; Load Buffer (Addr = r10), (Data = r11)
+lodsw r10,r11,+0
+
+POST_LOAD_BUFFER:
 lodsw r0,r6,+0
 ;; Mask upper or lower values
 and r6,r6,r5
@@ -589,12 +641,14 @@ and r6,r6,r5
 shr r6,r6,r9
 ;; Apply divide normalization
 div r6,r6,r4,q
+add r11,r11,r6
 stosw r6,r3,+0
 je r0,r7,END_STORE
 add r0,r0,4
 add r3,r3,1
-jmp STORE_RESULT
+jmp POST_LOAD_BUFFER
 END_STORE:
+stosw r11,r10,+0
 add r0,r0,4
 add r3,r3,1
 ret r15

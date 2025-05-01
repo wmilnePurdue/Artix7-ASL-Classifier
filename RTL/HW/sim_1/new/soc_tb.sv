@@ -23,7 +23,8 @@
 
 module soc_tb();
 
-localparam [31:0] DELAY_MS = 1000;
+localparam [31:0] DELAY_MS     = 1000;
+localparam [0:0]  RUN_ALT_FLOW = 1'b1;
 
 logic                  clk;
 logic                  resetn;
@@ -62,7 +63,7 @@ wire [7:0]  npu_data;
 
 soc_top SOC (
     .clk           (clk           ),
-    .resetn        (resetn        ),
+    .reset         (~resetn       ),
 			  
     .ext_input_io  (ext_input_io  ),
     .ext_output_io (ext_output_io ),
@@ -144,8 +145,10 @@ initial begin
 end
 
 initial begin
-    ext_input_io <= '0;
-    forever #500000 ext_input_io[0] <= ~ext_input_io[0];
+    ext_input_io    = '0;
+    ext_input_io[3] = RUN_ALT_FLOW;
+    @(posedge clk);
+    forever #10000 ext_input_io[0] <= ~ext_input_io[0];
 end
 
 initial begin
