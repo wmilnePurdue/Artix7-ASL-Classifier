@@ -56,7 +56,11 @@ module npu_ahb_decoder(
     output logic [11:0]    mem1_addr_o,
     output logic           mem1_wr_o,
     output logic [7:0]     mem1_wrdata_o,
-    input  wire  [7:0]     mem1_rddata_i
+    input  wire  [7:0]     mem1_rddata_i,
+
+    output logic [7:0]     r_mean_o,
+    output logic [7:0]     g_mean_o,
+    output logic [7:0]     b_mean_o
 );
 
 `include "ahb_intf.vh"
@@ -96,7 +100,12 @@ assign rd_only_csr[7] = {5'h0, act_overflow_lat_r};      // 0x8000_1020
 always_comb begin
     ahb_s0_hrdata_o = 32'h0;
     case(mem_prev_sel)
-        2'b00: ahb_s0_hrdata_o[5:0] = npu_thrshld_num_rows_to_start;
+        2'b00: case(mem_prev_o[4:2])
+                   3'b001: ahb_s0_hrdata_o[5:0] = npu_thrshld_num_rows_to_start;
+                   3'b010: ahb_s0_hrdata_o[7:0] = r_mean_o;
+                   3'b011: ahb_s0_hrdata_o[7:0] = g_mean_o;
+                   3'b100: ahb_s0_hrdata_o[7:0] = b_mean_o;
+               endcase
         2'b01: ahb_s0_hrdata_o[5:0] = rd_only_o;
         2'b10: ahb_s0_hrdata_o[7:0] = mem0_rddata_i;
         2'b11: ahb_s0_hrdata_o[7:0] = mem1_rddata_i;
@@ -127,6 +136,9 @@ always_ff @ (posedge clk, negedge resetn) begin
         mem0_wr_o                      <= 1'b0;
         mem1_wr_o                      <= 1'b0;
         rw_reg_wr                      <= 1'b0;
+        r_mean_o                       <= '0;
+        g_mean_o                       <= '0;
+        b_mean_o                       <= '0;
     end
     else begin
         csr_state <= csr_state_nxt;
@@ -147,9 +159,12 @@ always_ff @ (posedge clk, negedge resetn) begin
         end
         else begin
             if (rw_reg_wr) begin
-                case(mem_prev_o[2])
-                    1'b0: write_row                     <= ahb_s0_hwdata_i[0];
-                    1'b1: npu_thrshld_num_rows_to_start <= ahb_s0_hwdata_i[5:0];
+                case(mem_prev_o[4:2])
+                    3'b000: write_row                     <= ahb_s0_hwdata_i[0];
+                    3'b001: npu_thrshld_num_rows_to_start <= ahb_s0_hwdata_i[5:0];
+                    3'b010: r_mean_o                      <= ahb_s0_hwdata_i[7:0];
+                    3'b011: g_mean_o                      <= ahb_s0_hwdata_i[7:0];
+                    3'b100: b_mean_o                      <= ahb_s0_hwdata_i[7:0];
                 endcase
             end
             rw_reg_wr       <= 1'b0;

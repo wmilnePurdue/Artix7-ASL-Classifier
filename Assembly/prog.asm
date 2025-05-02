@@ -543,21 +543,24 @@ lsl r11,z,0
 lodsw r11,r10,+0
 shr r10,r10,10
 lss r11,z,0x8000
-stosw r10,r11,+11264
+;; stosw r10,r11,+11264
+stosw r10,r11,+8
 
 lsl r10,z,0
 lsl r11,z,1
 lodsw r11,r10,+0
 shr r10,r10,10
 lss r11,z,0x8000
-stosw r10,r11,+11265
+;; stosw r10,r11,+11265
+stosw r10,r11,+12
 
 lsl r10,z,0
 lsl r11,z,2
 lodsw r11,r10,+0
 shr r10,r10,10
 lss r11,z,0x8000
-stosw r10,r11,+11266
+;; stosw r10,r11,+11266
+stosw r10,r11,+16
 
 ;; Write NPU row
 lsl r10,z,32

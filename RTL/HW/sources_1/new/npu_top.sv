@@ -80,6 +80,10 @@ wire [24*`NPU_ACT_DATA_WIDTH-1:0] fc2_layer_output_data;
 wire            fc2_layer_output_valid_p;
 wire [`NPU_ACT_DATA_WIDTH-1:0] test_img_rdata;     
 
+wire [7:0] r_mean_o;
+wire [7:0] g_mean_o;
+wire [7:0] b_mean_o;
+
 //temporary assignments to enable synthesis
 
 npu_control_unit NPU_CTRL(
@@ -152,7 +156,11 @@ npu_ahb_decoder DECODER (
     .mem1_addr_o           (),
     .mem1_wr_o             (),
     .mem1_wrdata_o         (),
-    .mem1_rddata_i         (8'd0                   )
+    .mem1_rddata_i         (8'd0                   ),
+
+    .r_mean_o              (r_mean_o),
+    .g_mean_o              (g_mean_o),
+    .b_mean_o              (b_mean_o)
     );
 
 npu_rgb_input_mem RGB_INPUT_MEM (

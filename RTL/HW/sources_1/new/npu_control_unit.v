@@ -700,8 +700,17 @@ begin
     NPU_STATE_DONE:
     begin
 	// be in DONE state till a new image write starts
-        nxt_npu_state_r = (cfg_write_row_p) ? NPU_STATE_IDLE : NPU_STATE_DONE;
+        //nxt_npu_state_r = (trigger_npu_c) ? NPU_STATE_CONV1 : NPU_STATE_DONE;
+        // npu_layer_in_progress = 3'd7;
+        // if(trigger_npu_c) begin
+	    //     npu_layer_in_progress = 3'd0;
+        // end
+        nxt_npu_state_r = (cfg_write_row_p) ? NPU_STATE_CONV1 : NPU_STATE_DONE;
 	    npu_layer_in_progress = 3'd7;
+        if(test_mode_i & trigger_npu_c) begin
+            nxt_npu_state_r = NPU_STATE_CONV1;
+            npu_layer_in_progress = 3'd0;
+        end
     end
     default:
     begin
