@@ -209,7 +209,11 @@ npu_img_act_mem_ctrl NPU_IMG_ACT_CTRL(
     .hw_mem_wr_data                 (hw_mem_wr_data), 
     .hw_mem_wr_ack_p                (hw_mem_wr_ack_p),
     .test_img_rdata                 (test_img_rdata),
-    .test_mode_i                    (test_mode_i) 
+    .test_mode_i                    (test_mode_i),
+    .r_mean_o                       (r_mean_o),
+    .g_mean_o                       (g_mean_o),
+    .b_mean_o                       (b_mean_o), 
+    .activation_mem_rd_addr         (activation_mem_rd_addr[11:0])
     );
 
 npu_layer #(.DATA_WIDTH (`NPU_ACT_DATA_WIDTH), .NUM_FRAC_BITS(`NPU_NUM_FRAC_BITS)) NPU_LAYER_UNIT (

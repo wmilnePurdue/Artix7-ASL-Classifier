@@ -41,13 +41,18 @@ module npu_img_act_mem_ctrl(
     output wire [31:0]     hw_mem_wr_ack_p,
     
     input  wire            test_mode_i,
-    input  wire [15:0]     test_img_rdata
+    input  wire [15:0]     test_img_rdata,
+    input  wire [11:0]     activation_mem_rd_addr,
+    input  wire [7:0]      r_mean_o,
+    input  wire [7:0]      g_mean_o,
+    input  wire [7:0]      b_mean_o
 
 );
 
 integer j;
 reg [`NPU_ACT_DATA_WIDTH-1:0] hw_mem_wr_data_arr [31:0];
 reg [`LOG2_ACT_ADDR_WIDTH-1:0] hw_mem_wr_addr_arr [31:0];
+reg [7:0] muxed_mean_r;
 
 always @ (*)
 begin
@@ -106,6 +111,10 @@ assign hw_mem_wr_ack_p = {hw_mem_wr_ack_p_31,hw_mem_wr_ack_p_30,hw_mem_wr_ack_p_
 	hw_mem_wr_ack_p_7,hw_mem_wr_ack_p_6,hw_mem_wr_ack_p_5,hw_mem_wr_ack_p_4,hw_mem_wr_ack_p_3,
 	hw_mem_wr_ack_p_2,hw_mem_wr_ack_p_1,hw_mem_wr_ack_p_0};
 
+wire signed [15:0] raw_img_input_c = {3'd0,npu_rgb_rddata,5'd0};
+wire signed [15:0] mux_mean_c = {3'd0,muxed_mean_r,5'd0};  
+wire signed [15:0] zero_centered_img_c = raw_img_input_c - mux_mean_c;
+
 always @ (posedge clk or negedge resetn)
 begin
     if (~resetn) begin
@@ -113,17 +122,25 @@ begin
         npu_act_mem_wr_en       <= 1'b0;
         npu_act_mem_wr_addr     <= {`LOG2_ACT_ADDR_WIDTH{1'b0}};
         npu_act_mem_wr_data     <= {`NPU_ACT_DATA_WIDTH{1'b0}};
-	hw_rgb_mem_rd_r1        <= 1'b0;
-	hw_act_mem_rd_r1        <= 1'b0;
+	    hw_rgb_mem_rd_r1        <= 1'b0;
+	    hw_act_mem_rd_r1        <= 1'b0;
         hw_act_mem_rd_bypass_r1 <= 1'b0;
-	npu_muxed_rgb_act_mem_rd_data <= {`NPU_ACT_DATA_WIDTH{1'b0}};
+	    npu_muxed_rgb_act_mem_rd_data <= {`NPU_ACT_DATA_WIDTH{1'b0}};
+	    muxed_mean_r            <= 8'd0;
     end else begin
-	hw_rgb_mem_rd_r1        <= hw_rgb_mem_rd;
-	hw_act_mem_rd_r1        <= hw_act_mem_rd;
+        case(activation_mem_rd_addr[11:10])
+        2'b00: muxed_mean_r <= r_mean_o;
+        2'b01: muxed_mean_r <= g_mean_o;
+        2'b10: muxed_mean_r <= b_mean_o;
+        default: muxed_mean_r <= 8'd0;
+        endcase
+    
+	    hw_rgb_mem_rd_r1        <= hw_rgb_mem_rd;
+	    hw_act_mem_rd_r1        <= hw_act_mem_rd;
         hw_act_mem_rd_bypass_r1 <= hw_act_mem_rd_bypass;
 	// Bypass is set for Pad in Conv layer
 	npu_muxed_rgb_act_mem_rd_data <= (hw_act_mem_rd_bypass_r1) ? {`NPU_ACT_DATA_WIDTH{1'b0}} : 
-				         (hw_rgb_mem_rd_r1) ? (test_mode_i ? test_img_rdata : {3'd0,npu_rgb_rddata,5'd0})
+				         (hw_rgb_mem_rd_r1) ? (test_mode_i ? test_img_rdata : zero_centered_img_c)
 				          : npu_act_mem_rd_data;
 	
 	if (atleast_one_wr_set_c) begin

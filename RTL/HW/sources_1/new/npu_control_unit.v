@@ -49,7 +49,7 @@ input [4:0] softmax_class_predicted;
 
 // Status
 output npu_active; // when 1 indicates CNN operation in progress; cleared when operation is done
-output npu_done; 
+output reg npu_done; 
 output reg [2:0] npu_layer_in_progress;
 output reg [5:0] img_num_rows_written;
 output reg [4:0] npu_class_predicted;
@@ -83,23 +83,24 @@ output reg mac_overflow_lat_r;
 output reg act_overflow_lat_r;
 
 // State one-hot defines
-localparam NPU_STATE_IDLE                 = 14'b00_0000_0000_0001;
-localparam NPU_STATE_CONV1                = 14'b00_0000_0000_0010;
-localparam NPU_STATE_WAIT_CONV1_RESULT_WR = 14'b00_0000_0000_0100;
-localparam NPU_STATE_CONV2                = 14'b00_0000_0000_1000;
-localparam NPU_STATE_WAIT_CONV2_RESULT_WR = 14'b00_0000_0001_0000;
-localparam NPU_STATE_CONV3                = 14'b00_0000_0010_0000;
-localparam NPU_STATE_WAIT_CONV3_RESULT_WR = 14'b00_0000_0100_0000;
-localparam NPU_STATE_FC1_1                = 14'b00_0000_1000_0000;
-localparam NPU_STATE_WAIT_FC1_1_RESULT_WR = 14'b00_0001_0000_0000;
-localparam NPU_STATE_FC1_2                = 14'b00_0010_0000_0000;
-localparam NPU_STATE_WAIT_FC1_2_RESULT_WR = 14'b00_0100_0000_0000;
-localparam NPU_STATE_FC2                  = 14'b00_1000_0000_0000;
-localparam NPU_STATE_SOFTMAX              = 14'b01_0000_0000_0000;
-localparam NPU_STATE_DONE                 = 14'b10_0000_0000_0000;
+localparam NPU_STATE_IDLE                    = 15'b000_0000_0000_0001;
+localparam NPU_STATE_CONV1                   = 15'b000_0000_0000_0010;
+localparam NPU_STATE_WAIT_CONV1_RESULT_WR    = 15'b000_0000_0000_0100;
+localparam NPU_STATE_CONV2                   = 15'b000_0000_0000_1000;
+localparam NPU_STATE_WAIT_CONV2_RESULT_WR    = 15'b000_0000_0001_0000;
+localparam NPU_STATE_CONV3                   = 15'b000_0000_0010_0000;
+localparam NPU_STATE_WAIT_CONV3_RESULT_WR    = 15'b000_0000_0100_0000;
+localparam NPU_STATE_FC1_1                   = 15'b000_0000_1000_0000;
+localparam NPU_STATE_WAIT_FC1_1_RESULT_WR    = 15'b000_0001_0000_0000;
+localparam NPU_STATE_FC1_2                   = 15'b000_0010_0000_0000;
+localparam NPU_STATE_WAIT_FC1_2_RESULT_WR    = 15'b000_0100_0000_0000;
+localparam NPU_STATE_FC2                     = 15'b000_1000_0000_0000;
+localparam NPU_STATE_SOFTMAX                 = 15'b001_0000_0000_0000;
+localparam NPU_STATE_WAIT_SOFTMAX_RESULT_WR  = 15'b010_0000_0000_0000;
+localparam NPU_STATE_DONE                    = 15'b100_0000_0000_0000;
 
-reg [13:0] npu_state_r;
-reg [13:0] nxt_npu_state_r;
+reg [14:0] npu_state_r;
+reg [14:0] nxt_npu_state_r;
 // Filter counters
 reg [1:0] filter_row_cnt_r;
 reg [1:0] filter_col_cnt_r;
@@ -154,7 +155,7 @@ reg [3:0] filter_num_in_ch_cnt_r1;
 reg bypass_act_mem_rd_r2;
 reg npu_done_r1;
 
-wire npu_done = (npu_state_r == NPU_STATE_DONE);
+wire npu_done_c = (npu_state_r == NPU_STATE_DONE);
 wire npu_active = (npu_state_r != NPU_STATE_IDLE) & (npu_state_r != NPU_STATE_DONE);
 
 wire cur_state_idle_c  = (npu_state_r == NPU_STATE_IDLE);
@@ -169,6 +170,7 @@ wire cur_state_wait_conv2_result_wr_c = (npu_state_r == NPU_STATE_WAIT_CONV2_RES
 wire cur_state_wait_conv3_result_wr_c = (npu_state_r == NPU_STATE_WAIT_CONV3_RESULT_WR);
 wire cur_state_wait_fc1_1_result_wr_c = (npu_state_r == NPU_STATE_WAIT_FC1_1_RESULT_WR);
 wire cur_state_wait_fc1_2_result_wr_c = (npu_state_r == NPU_STATE_WAIT_FC1_2_RESULT_WR);
+wire cur_state_wait_softmax_result_wr_c = (npu_state_r == NPU_STATE_WAIT_SOFTMAX_RESULT_WR);
 
 
 wire output_pixel_comp_boundary_c = (filter_row_cnt_r == 2'd2) & (filter_col_cnt_r == 2'd2) & 
@@ -380,6 +382,7 @@ wire fc2_terminal_cnt_c = (fc2_act_cnt == 6'd63);
 // As per flattening order done by Matlab Flatten layer; Row (or Height first), then Col (or Width) and then input channel
 
 wire result_wr_wait_terminal_cnt_c = (result_wr_wait_cnt == 6'd63);
+wire result_wr_wait_softmax_terminal_cnt_c = (result_wr_wait_cnt == 6'd7);
 
 always @ (posedge npu_clk, negedge npu_rst_n)  begin
     if (~npu_rst_n) begin
@@ -426,7 +429,7 @@ always @ (posedge npu_clk, negedge npu_rst_n)  begin
         end  
         
         if (cur_state_wait_conv1_result_wr_c | cur_state_wait_conv2_result_wr_c | cur_state_wait_conv3_result_wr_c |
-            cur_state_wait_fc1_1_result_wr_c | cur_state_wait_fc1_2_result_wr_c) begin
+            cur_state_wait_fc1_1_result_wr_c | cur_state_wait_fc1_2_result_wr_c | cur_state_wait_softmax_result_wr_c) begin
             result_wr_wait_cnt <= result_wr_wait_cnt + 6'd1;
         end else begin
             result_wr_wait_cnt <= 6'd0;
@@ -496,7 +499,7 @@ always @ (posedge npu_clk, negedge npu_rst_n) begin
    bypass_act_mem_rd_r2           <= bypass_act_mem_rd_r1_c;
    fc2_act_cnt_r1                 <= fc2_act_cnt;
    fc2_act_cnt_r2                 <= fc2_act_cnt_r1;
-   npu_done_r1                    <= npu_done;
+   npu_done_r1                    <= npu_done_c;
   end
 end
 
@@ -582,6 +585,7 @@ begin
       mac_last_p             <=  1'b0; 
       mac_overflow_lat_r     <=  1'b0;
       act_overflow_lat_r     <=  1'b0;
+	  npu_done               <=  1'b0;
   end else begin
       // Filter read en and addr
       filter_mem_rd_en       <=  filter_rd_en_mux_r3_c;
@@ -606,10 +610,11 @@ begin
       activation_mem_rd_en      <= cur_state_fc_or_conv_r2_excpt_conv1_c;
       activation_mem_rd_addr    <= activation_mem_rd_addr_rel_mux_r2_c + activation_mem_start_offset_r2_c;     
 
+	  npu_done   <= (cfg_write_row_p) ? 1'b0 : (npu_done_c & ~npu_done_r1) ? 1'b1 : npu_done;
       // cfg_write_row_p indicates CPU has written 1ROW for all 3 channels
       // i.e. 32x3 pixels. Increment counter when this pulse is rcvd
       // reset counter when NPU is done
-      if (npu_done & ~npu_done_r1) begin
+      if (npu_done_c & ~npu_done_r1) begin
           img_num_rows_written   <=  6'd0;
       end else if (cfg_write_row_p) begin
 	      img_num_rows_written   <= img_num_rows_written + 6'd1;
@@ -694,23 +699,19 @@ begin
     end
     NPU_STATE_SOFTMAX:
     begin
-        nxt_npu_state_r = (softmax_result_valid_p) ? NPU_STATE_DONE : NPU_STATE_SOFTMAX;
+        nxt_npu_state_r = (softmax_result_valid_p) ? NPU_STATE_WAIT_SOFTMAX_RESULT_WR : NPU_STATE_SOFTMAX;
+	    npu_layer_in_progress = 3'd7;
+    end
+    NPU_STATE_WAIT_SOFTMAX_RESULT_WR:
+    begin
+        nxt_npu_state_r = (result_wr_wait_softmax_terminal_cnt_c) ? NPU_STATE_DONE : NPU_STATE_WAIT_SOFTMAX_RESULT_WR;
 	    npu_layer_in_progress = 3'd7;
     end
     NPU_STATE_DONE:
     begin
 	// be in DONE state till a new image write starts
-        //nxt_npu_state_r = (trigger_npu_c) ? NPU_STATE_CONV1 : NPU_STATE_DONE;
-        // npu_layer_in_progress = 3'd7;
-        // if(trigger_npu_c) begin
-	    //     npu_layer_in_progress = 3'd0;
-        // end
-        nxt_npu_state_r = (cfg_write_row_p) ? NPU_STATE_CONV1 : NPU_STATE_DONE;
+        nxt_npu_state_r = NPU_STATE_IDLE;
 	    npu_layer_in_progress = 3'd7;
-        if(test_mode_i & trigger_npu_c) begin
-            nxt_npu_state_r = NPU_STATE_CONV1;
-            npu_layer_in_progress = 3'd0;
-        end
     end
     default:
     begin
